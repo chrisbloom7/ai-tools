@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "chrisbloom7-development",
-      "source": "./plugins/chrisbloom7-development",
+      "source": "./claude-code/plugins/chrisbloom7-development",
       "description": "Development workflow tools for worktree-based feature development"
     }
   ]
