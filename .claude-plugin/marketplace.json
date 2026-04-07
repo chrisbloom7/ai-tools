@@ -1,0 +1,17 @@
+{
+  "name": "ai-tools",
+  "owner": {
+    "name": "Chris Bloom"
+  },
+  "metadata": {
+    "description": "Development workflow skills for Claude Code",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "chrisbloom7-development",
+      "source": "./plugins/chrisbloom7-development",
+      "description": "Development workflow tools for worktree-based feature development"
+    }
+  ]
+}
