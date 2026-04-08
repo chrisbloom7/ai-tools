@@ -1,6 +1,6 @@
 ---
 name: worktree-start
-description: Start development on a new task by planning, creating an isolated worktree, writing context, and bootstrapping a Claude session. Use this skill whenever the user is on a main worktree and asks to start work on a feature, issue, story, bug, task, or ticket — even if they don't mention "worktree" explicitly. Also use when they say "start working on", "pick up", "begin implementing", "kick off", or provide an issue tracker ID/URL and expect development to begin. Requires worktrunk CLI.
+description: Start development on a new task using an isolated worktree. Use this skill when the user explicitly requests a worktree ("spin up a worktree", "start a worktree for..."), or when they ask to start work on a task AND the repo shows worktree signals (worktrunk config present, .worktrees/ directory exists, or CLAUDE.md mentions worktrees). Do NOT trigger automatically just because the user wants to start development — check first. Requires worktrunk CLI.
 compatibility: Requires worktrunk CLI (https://worktrunk.dev) and git
 ---
 
@@ -13,12 +13,35 @@ This skill builds on top of worktrunk (`wt` CLI) for worktree management. It add
 ## Prerequisites
 
 - **worktrunk CLI** (`wt`) must be installed and configured
+- **`worktree-path` template configured** in `~/.config/worktrunk/config.toml` — run `wt config show` to verify. If missing, run `wt config create` and set the template before continuing. Without it, `wt switch --create` will prompt interactively for a location.
 - **git** repository with a clean working tree on the main branch (or a primary worktree)
 - A task to work on (issue tracker ID, URL, description, or verbal explanation)
 
 ## Workflow
 
 Work through these steps in order. Do not skip steps.
+
+### Step 0 — Decide Whether a Worktree Is Appropriate
+
+Before proceeding, confirm a worktree is the right approach. Check in order:
+
+1. **Explicit request** — did the user say "worktree", "spin up", "isolated session", or similar? If yes, proceed.
+
+2. **Repo signals** — does the repo show worktree usage?
+   - `~/.config/worktrunk/config.toml` exists (worktrunk is configured)
+   - `.worktrees/` directory exists at the repo root
+   - `CLAUDE.md` mentions worktrees or worktrunk
+
+   If any signal is present and the user is starting non-trivial work, proceed.
+
+3. **Ask if uncertain** — if neither of the above, do not assume. Ask the user, surfacing relevant context:
+   - Is this a multi-step feature or a quick fix?
+   - Does the task have an issue tracker ID (suggesting tracked, non-trivial work)?
+   - Is the repo branch-heavy (many open branches visible in `git branch -r`)?
+
+   Frame the question helpfully: "This looks like [quick fix / tracked feature]. Would you like a worktree for isolation, or work directly on this branch?"
+
+   If the user declines, stop — do not proceed with this skill.
 
 ### Step 1 — Gather Task Details
 

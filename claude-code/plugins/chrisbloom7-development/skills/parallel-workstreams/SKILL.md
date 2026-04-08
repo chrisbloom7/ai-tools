@@ -31,6 +31,15 @@ Gather all tasks the user wants to parallelize:
 
 Before creating any worktrees:
 
+**Repo worktree check** — confirm the repo is set up for worktree development:
+- `~/.config/worktrunk/config.toml` exists, OR
+- `.worktrees/` directory exists at the repo root, OR
+- `CLAUDE.md` mentions worktrees or worktrunk
+
+If none of these are present, flag it before proceeding: "This repo doesn't appear to use worktrees yet. Parallel development will require them — want to proceed?" Stop if the user declines.
+
+
+
 1. **Project prerequisites** — Check for project-specific companion skills (same extensibility mechanism as `worktree-start`). If one exists, invoke it for pre-flight checks: services that need to be running, authentication that needs to be valid, etc. Run these once, not per-worktree.
 
 2. **Independence validation** — Confirm the tasks are genuinely independent. For each pair of tasks, check:
