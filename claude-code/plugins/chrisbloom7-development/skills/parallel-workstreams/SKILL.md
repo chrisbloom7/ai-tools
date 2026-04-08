@@ -72,11 +72,13 @@ Wait for user approval before proceeding to execution.
 After approval, create each workstream sequentially using the `worktree-start` workflow:
 
 1. Create worktree via `wt switch --create`
-2. Write `WORKTREE_CONTEXT.md` (include ordering constraints from Step 2 if applicable)
-3. Open session (tmux window, zellij pane, or editor)
-4. Return to main worktree before creating the next one
+2. Write `WORKTREE_CONTEXT.md` — include ordering constraints from Step 2 if applicable, and include a **"Before You Begin"** section as the first action item for the worktree agent:
+   > Validate this context file and the implementation plan. Check for incorrect assumptions that may have introduced gaps or could lead to errors in production. Do not make any changes to either document. Report your findings, then stop. Do not start work until given explicit approval.
+3. Open the session window using the multiplexer (see `worktree-start` Step 5 for the exact tmux/zellij/fallback commands, session name, and path conventions).
+4. **Send the kickoff prompt** — this is the step most commonly missed. Immediately after creating the window, send `claude <kickoff-prompt>` via `send-keys` (tmux) or equivalent. Do not skip this step. Verify the first window received the prompt before creating the remaining worktrees.
+5. Return to main worktree before creating the next one.
 
-**tmux note:** When creating multiple windows, derive unique window names from task IDs or short slugs. Test the first window before looping — mistakes create duplicate windows that must be manually killed.
+**tmux note:** When creating multiple windows, derive unique window names from task IDs or short slugs. Test window creation **and** the send-keys command on the first worktree before proceeding to the others — a bad escape or wrong target pane is easy to spot early, but a silent failure (window created, Claude never started) is easy to miss when creating many at once.
 
 ### Step 5 — Report
 
