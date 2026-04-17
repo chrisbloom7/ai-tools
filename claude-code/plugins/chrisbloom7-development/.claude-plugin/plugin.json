@@ -1,8 +1,7 @@
 {
   "name": "chrisbloom7-development",
   "description": "Development workflow tools for worktree-based feature development",
-  "version": "1.0.0",
-  "author": {
+"author": {
     "name": "Chris Bloom"
   },
   "skills": [

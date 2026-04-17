@@ -4,8 +4,7 @@
     "name": "Chris Bloom"
   },
   "metadata": {
-    "description": "Development workflow skills for Claude Code",
-    "version": "1.0.0"
+    "description": "Development workflow skills for Claude Code"
   },
   "plugins": [
     {
