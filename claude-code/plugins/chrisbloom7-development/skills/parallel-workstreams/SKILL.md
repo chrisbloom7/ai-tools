@@ -40,9 +40,25 @@ If none of these are present, flag it before proceeding: "This repo doesn't appe
 
 
 
-1. **Project prerequisites** — Check for project-specific companion skills (same extensibility mechanism as `worktree-start`). If one exists, invoke it for pre-flight checks: services that need to be running, authentication that needs to be valid, etc. Run these once, not per-worktree.
+1. **Main branch currency** — Before creating any worktrees, check whether the main
+   branch is behind its remote:
 
-2. **Independence validation** — Confirm the tasks are genuinely independent. For each pair of tasks, check:
+   ```bash
+   git fetch --quiet
+   behind=$(git rev-list --count HEAD..@{u} 2>/dev/null)
+   ```
+
+   - If `behind` is `0` (or there is no upstream), proceed.
+   - If `behind` is non-zero, **stop and ask the user:**
+     > "Your main branch is `$behind` commit(s) behind its remote. Pull before creating
+     > worktrees? (Recommended — all workstreams will branch from the stale base
+     > otherwise.)"
+     - If yes: run `git pull` and verify success before continuing.
+     - If no: note in the Step 5 report that all worktrees were created from a stale base.
+
+2. **Project prerequisites** — Check for project-specific companion skills (same extensibility mechanism as `worktree-start`). If one exists, invoke it for pre-flight checks: services that need to be running, authentication that needs to be valid, etc. Run these once, not per-worktree.
+
+3. **Independence validation** — Confirm the tasks are genuinely independent. For each pair of tasks, check:
    - Do they touch the same files or areas of the codebase?
    - Does one depend on the output of another?
    - Are there database migrations that could conflict?
@@ -52,7 +68,7 @@ If none of these are present, flag it before proceeding: "This repo doesn't appe
    - Sequence the overlapping tasks (one after the other)
    - Regroup (combine overlapping tasks into one workstream)
 
-3. **Ordering constraints** — Note any merge ordering dependencies. Example: "Task A introduces a new API that Task B consumes — Task A must merge first." Record these for inclusion in each `WORKTREE_CONTEXT.md`.
+4. **Ordering constraints** — Note any merge ordering dependencies. Example: "Task A introduces a new API that Task B consumes — Task A must merge first." Record these for inclusion in each `WORKTREE_CONTEXT.md`.
 
 ### Step 3 — Plan All Workstreams
 

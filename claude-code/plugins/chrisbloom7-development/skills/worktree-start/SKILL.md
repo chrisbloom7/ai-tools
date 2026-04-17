@@ -66,6 +66,22 @@ Present the plan and wait for user approval before continuing.
 
 ### Step 3 — Create the Worktree
 
+**Check that the main branch is current before branching.** Run:
+
+```bash
+git fetch --quiet
+behind=$(git rev-list --count HEAD..@{u} 2>/dev/null)
+```
+
+- If `behind` is `0` (or the command errors because there is no upstream), proceed.
+- If `behind` is non-zero, **stop and ask the user:**
+  > "Your main branch is `$behind` commit(s) behind its remote. Pull in the upstream
+  > changes before creating the worktree? (Recommended — skipping may cause unnecessary
+  > merge conflicts.)"
+  - If yes: run `git pull` and verify it succeeds before continuing.
+  - If no: proceed, but note in the Step 6 report that the worktree was created from a
+    stale base.
+
 Use worktrunk to create and switch to a new worktree:
 
 ```bash
