@@ -181,6 +181,24 @@ If there are merge ordering constraints or dependencies on other work, remind th
 
 ---
 
+## Stacked PRs
+
+When work requires stacked PRs (PR B builds on PR A), each level of the stack gets its
+own worktree. Do **not** create a second branch inside an existing worktree.
+
+**Correct pattern:**
+1. Create worktree A from main: `wt switch --create feature/pr-a`
+2. When PR A is ready and you need PR B, create worktree B from A's branch:
+   ```bash
+   # From the main worktree, with feature/pr-a as the base
+   wt switch --create feature/pr-b --base feature/pr-a
+   ```
+3. Each worktree contains only the changes for its own PR.
+
+**Why:** A worktree's working tree reflects one branch. If you create `feature/pr-b`
+inside `feature/pr-a`'s worktree, both sets of changes are visible simultaneously —
+you lose isolation and git operations (diff, status, review) become confusing.
+
 ## What This Skill Does NOT Do
 
 - **Merge or PR management** — use `wt merge` or your project's PR skill for that

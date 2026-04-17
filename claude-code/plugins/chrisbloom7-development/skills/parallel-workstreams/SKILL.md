@@ -83,6 +83,12 @@ For each task, produce the implementation plan that `worktree-start` Step 2 woul
 
 Wait for user approval before proceeding to execution.
 
+**Stacked workstreams:** If any tasks form a stack (B depends on A's output merging
+first), do not plan them as branches within a single worktree. Each level is its own
+workstream with its own worktree. The base branch for the dependent worktree is the
+branch from the upstream task, not main. Note this in both `WORKTREE_CONTEXT.md` files
+under Key Constraints.
+
 ### Step 4 — Execute
 
 After approval, create each workstream sequentially using the `worktree-start` workflow:
