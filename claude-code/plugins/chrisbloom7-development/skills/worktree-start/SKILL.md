@@ -116,7 +116,18 @@ Write a `WORKTREE_CONTEXT.md` file in the new worktree root. This file is the pr
 [Design decisions, context from related work, anything the new session needs to know]
 ```
 
-The new session loads this file automatically via `CLAUDE.local.md` containing `@WORKTREE_CONTEXT.md`. If the project doesn't have this auto-load mechanism set up, note that in your report (Step 6).
+**After writing the file, check whether it will be auto-loaded.** Look for a line
+containing `@@WORKTREE_CONTEXT.md` in either `CLAUDE.md` or `CLAUDE.local.md` in the
+worktree root:
+
+```bash
+grep -rl "@@WORKTREE_CONTEXT.md" CLAUDE.md CLAUDE.local.md 2>/dev/null
+```
+
+- **If a match is found:** the file will be auto-loaded — no further action needed here.
+- **If no match is found:** set a flag (`auto_load=false`) that Step 5 will use to
+  adjust the kickoff prompt. Do not create or modify `CLAUDE.md` / `CLAUDE.local.md`
+  yourself — that is the user's configuration to own.
 
 ### Step 5 — Open a Session in the Worktree
 
@@ -136,7 +147,11 @@ worktree_path="<absolute-path-to-worktree>"
 
 # Send kickoff prompt — MUST escape with printf %q to handle
 # apostrophes, ?, $, and other special characters safely
-kickoff="Hey Claude, do you know what we're working on?"
+if [ "$auto_load" = "false" ]; then
+  kickoff="Please read WORKTREE_CONTEXT.md first to understand the task, then confirm what we're working on."
+else
+  kickoff="Hey Claude, do you know what we're working on?"
+fi
 escaped=$(printf %q "$kickoff")
 /opt/homebrew/bin/tmux send-keys -t "$window_name" "claude $escaped" Enter
 ```
@@ -152,7 +167,11 @@ escaped=$(printf %q "$kickoff")
 If `$ZELLIJ` is set:
 
 ```bash
-zellij run -- bash -c "cd '$worktree_path' && claude 'Hey Claude, do you know what we are working on?'"
+if [ "$auto_load" = "false" ]; then
+  zellij run -- bash -c "cd '$worktree_path' && claude 'Please read WORKTREE_CONTEXT.md first to understand the task, then confirm what we are working on.'"
+else
+  zellij run -- bash -c "cd '$worktree_path' && claude 'Hey Claude, do you know what we are working on?'"
+fi
 ```
 
 Note: avoid contractions in zellij prompts to sidestep quoting issues.
@@ -162,7 +181,9 @@ Note: avoid contractions in zellij prompts to sidestep quoting issues.
 If neither tmux nor zellij is detected:
 
 1. Open the worktree in the user's editor: `$EDITOR <worktree-path>`
-2. Instruct the user to start Claude Code in that directory and send the kickoff prompt: **"Hey Claude, do you know what we're working on?"**
+2. Instruct the user to start Claude Code in that directory. Then:
+   - **If auto-load is configured:** tell them to send: *"Hey Claude, do you know what we're working on?"*
+   - **If auto-load is NOT configured:** tell them to send: *"Please read `WORKTREE_CONTEXT.md` first to understand the task, then confirm what we're working on."*
 
 ### Step 6 — Report
 
@@ -175,7 +196,7 @@ Confirm the setup:
 | Task | `<title or ID>` |
 | Session | opened in tmux/zellij / manual instructions provided |
 | Context | `WORKTREE_CONTEXT.md` written |
-| Auto-load | confirmed / not configured (manual load needed) |
+| Auto-load | confirmed / not configured — kickoff prompt adjusted to request manual read |
 
 If there are merge ordering constraints or dependencies on other work, remind the user here.
 
