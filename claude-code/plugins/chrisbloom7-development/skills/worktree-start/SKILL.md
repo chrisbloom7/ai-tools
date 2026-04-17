@@ -116,12 +116,15 @@ Write a `WORKTREE_CONTEXT.md` file in the new worktree root. This file is the pr
 [Design decisions, context from related work, anything the new session needs to know]
 ```
 
+Set `auto_load=true` as the default, then run the check — if the file is not referenced,
+override it to `false`:
+
 **After writing the file, check whether it will be auto-loaded.** Look for a line
 containing `@@WORKTREE_CONTEXT.md` in either `CLAUDE.md` or `CLAUDE.local.md` in the
 worktree root:
 
 ```bash
-grep -rl "@@WORKTREE_CONTEXT.md" CLAUDE.md CLAUDE.local.md 2>/dev/null
+grep -l "@@WORKTREE_CONTEXT.md" CLAUDE.md CLAUDE.local.md 2>/dev/null
 ```
 
 - **If a match is found:** the file will be auto-loaded — no further action needed here.

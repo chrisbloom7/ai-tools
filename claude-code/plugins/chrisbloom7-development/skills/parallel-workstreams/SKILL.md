@@ -124,7 +124,8 @@ Present a summary table of all workstreams:
 Include:
 - Any merge ordering constraints (repeated here for visibility)
 - How to switch between sessions (e.g., tmux window navigation)
-- Reminder that each session auto-loads its `WORKTREE_CONTEXT.md` on first prompt
+- Reminder that sessions with auto-load configured will load `WORKTREE_CONTEXT.md`
+  automatically; others received an explicit read instruction in the kickoff prompt
 
 ---
 
