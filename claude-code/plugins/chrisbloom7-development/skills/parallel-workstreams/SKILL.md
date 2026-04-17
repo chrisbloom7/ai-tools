@@ -38,7 +38,7 @@ Before creating any worktrees:
 
 If none of these are present, flag it before proceeding: "This repo doesn't appear to use worktrees yet. Parallel development will require them — want to proceed?" Stop if the user declines.
 
-
+Then run the following checks:
 
 1. **Main branch currency** — Before creating any worktrees, check whether the main
    branch is behind its remote:
@@ -48,7 +48,7 @@ If none of these are present, flag it before proceeding: "This repo doesn't appe
    behind=$(git rev-list --count HEAD..@{u} 2>/dev/null)
    ```
 
-   - If `behind` is `0` (or there is no upstream), proceed.
+   - If `behind` is `0` (or the command errors because there is no upstream), proceed.
    - If `behind` is non-zero, **stop and ask the user:**
      > "Your main branch is `$behind` commit(s) behind its remote. Pull before creating
      > worktrees? (Recommended — all workstreams will branch from the stale base
