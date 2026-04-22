@@ -138,7 +138,9 @@ Detect the terminal environment and open a new Claude session in the worktree:
 
 #### tmux (preferred — fully automated)
 
-If `$TMUX` is set, create a new window in the current tmux session:
+If `$TMUX` is set, create a new window in the current tmux session.
+
+If `$TMUX` is NOT set but tmux is available (`test -n "$(command -v tmux 2>/dev/null)"`), check if any sessions are currently open with `tmux list` and ask the user which one to use or if a new one should be started. Then stop and wait for input before continuing.
 
 ```bash
 # Derive window name from branch or task ID
