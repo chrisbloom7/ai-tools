@@ -92,8 +92,12 @@ suggest using them directly. A PDF that only wraps a bitmap is flagged, not trac
      otherwise.
 6. **Build:** `logo build <brand_dir>`. It assesses, builds every output, verifies each lockup
    against its source and writes the documents. It exits nonzero when a lockup misses the bar.
-   Nothing in the brand folder changes until the whole build succeeds, so a failed build
-   leaves the previous outputs and documents untouched: fix the config and rebuild.
+   The build changes no output until all of it has succeeded, so a failed build leaves the
+   previous outputs and documents exactly as they were (it only clears its own leftover
+   `.build-staging-<pid>/` and `.build-discard-<pid>/` folders): fix the config and rebuild.
+   If a build is killed while swapping, or cannot undo a failed swap, it leaves
+   `.build-previous-<pid>/` holding the earlier outputs, and every later build refuses to
+   start until you move its contents back into the brand folder or delete it.
 7. **Review before claiming anything:** read `report/conversion-report.md` (tier, verify
    numbers, dropped pieces, what was traced flat or with gradients). Then open and look at the
    key files next to the sources: `png/logo-stacked-<variant>-1200.png`,
@@ -120,11 +124,14 @@ suggest using them directly. A PDF that only wraps a bitmap is flagged, not trac
     └── svg/  pdf/  png/       # the PDFs exist only here, in logo-package/pdf/
 ```
 
-A successful build replaces `svg/`, `png/`, `logo-package/`, `report/` and `README.md` as a
-whole; a failed one changes nothing. Everything else in the brand folder (`source/`,
-`brand.toml`, your own files) is never touched. The build stages its work in a hidden
-`.build-staging-<pid>/` folder inside the brand folder and removes it when done. The generated
-`README.md` gives the owner the full rebuild command.
+A successful build replaces `svg/`, `png/`, `logo-package/`, `README.md` and
+`report/conversion-report.md`, each as a whole; a failed one leaves them as they were (see step
+6). Everything else in the brand folder (`source/`, `brand.toml`, your own files, including any
+other file in `report/`) is never touched. The build stages its work in a hidden
+`.build-staging-<pid>/` folder inside the brand folder and removes it when done. A managed
+folder that is a symlink is replaced by a real folder (the link's target is left alone), and
+a managed folder that is a mount point cannot be built into. The generated `README.md` gives
+the owner the full rebuild command.
 
 ## Rules
 
