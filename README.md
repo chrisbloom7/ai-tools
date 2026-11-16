@@ -11,7 +11,8 @@ ai-tools/
 │       └── chrisbloom7-development/
 │           └── skills/
 │               ├── worktree-start
-│               └── parallel-workstreams
+│               ├── parallel-workstreams
+│               └── release
 └── ...                   # Future ecosystems (ChatGPT, Copilot, etc.)
 ```
 
@@ -32,5 +33,6 @@ Development workflow tools for worktree-based feature development.
 |-------|-------------|
 | `chrisbloom7-development:worktree-start` | Start development on a single task: plan, create worktree, write context, bootstrap session |
 | `chrisbloom7-development:parallel-workstreams` | Plan and orchestrate multiple parallel worktree sessions |
+| `chrisbloom7-development:release` | Cut a release: validate, rotate the CHANGELOG, open the release PR, then tag after the owner merges. Project specifics come from a per-project overlay |
 
 > Requires [worktrunk CLI](https://worktrunk.dev).

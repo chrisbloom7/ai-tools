@@ -6,6 +6,7 @@
   },
   "skills": [
     "./skills/worktree-start",
-    "./skills/parallel-workstreams"
+    "./skills/parallel-workstreams",
+    "./skills/release"
   ]
 }
