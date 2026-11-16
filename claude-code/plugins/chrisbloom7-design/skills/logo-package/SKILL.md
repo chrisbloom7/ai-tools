@@ -92,9 +92,8 @@ suggest using them directly. A PDF that only wraps a bitmap is flagged, not trac
      otherwise.
 6. **Build:** `logo build <brand_dir>`. It assesses, builds every output, verifies each lockup
    against its source and writes the documents. It exits nonzero when a lockup misses the bar.
-   A build that fails after it starts leaves no outputs (the previous `svg/`, `png/` and
-   `logo-package/` are already deleted, and the documents are stale): fix the config and
-   rebuild.
+   Nothing in the brand folder changes until the whole build succeeds, so a failed build
+   leaves the previous outputs and documents untouched: fix the config and rebuild.
 7. **Review before claiming anything:** read `report/conversion-report.md` (tier, verify
    numbers, dropped pieces, what was traced flat or with gradients). Then open and look at the
    key files next to the sources: `png/logo-stacked-<variant>-1200.png`,
@@ -121,8 +120,11 @@ suggest using them directly. A PDF that only wraps a bitmap is flagged, not trac
     └── svg/  pdf/  png/       # the PDFs exist only here, in logo-package/pdf/
 ```
 
-A build deletes and regenerates `svg/`, `png/` and `logo-package/`, and overwrites the three
-documents. The generated `README.md` gives the owner the full rebuild command.
+A successful build replaces `svg/`, `png/`, `logo-package/`, `report/` and `README.md` as a
+whole; a failed one changes nothing. Everything else in the brand folder (`source/`,
+`brand.toml`, your own files) is never touched. The build stages its work in a hidden
+`.build-staging-<pid>/` folder inside the brand folder and removes it when done. The generated
+`README.md` gives the owner the full rebuild command.
 
 ## Rules
 
