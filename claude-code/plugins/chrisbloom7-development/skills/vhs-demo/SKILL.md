@@ -27,7 +27,7 @@ Ask these together, with the defaults, before writing anything. Skip a question 
 - **Clear the screen** with `Ctrl+L` before each step after the first, so output does not scroll off and the GIF stays small.
 - **`Sleep 500ms` before `Enter`** after each typed command, then a `Sleep` long enough to read the output.
 
-This example is adapted from a tape rendered with vhs 0.12.1. `banner.py` is this skill's `scripts/banner.py`, copied next to the tape:
+This example, exactly as written, was validated and rendered with vhs 0.12.1 against a stand-in `mytool` shell script and a `claude` stub (the first and last frames matched). `banner.py` is this skill's `scripts/banner.py`, copied next to the tape:
 
 ```tape
 # README demo: find a past session by one word, read it in context, resume it. Needs `vhs`.
@@ -96,7 +96,7 @@ Sleep 2500ms
 
 For in-file comments, drop the `Type@25ms "# ..."` lines and put a `#` comment above each group instead. `Type` accepts backticks around text that contains double quotes; `\"` is not valid.
 
-**Title card.** Copy `scripts/banner.py` from this skill's directory to the demo directory (`command cp -f`, since `cp` may be an interactive alias) and call it as `python3 banner.py "<name>" "<tagline>"`. It prints the name in 5-row block letters with a magenta-to-cyan gradient, centered in the terminal, one row at a time, then the tagline. It needs only Python 3. Use a name that fits: the art is 7 columns per letter and the terminal has about width ÷ 10 columns at font size 15-16, so 14 letters need about 100 columns (use the short name, for example `brewfile` for `brewfile-tools`, whose 105 columns would not fit at width 1000). Set `PS1=` before drawing so no prompt shows under it. The script hides the cursor when it finishes, so run `tput cnorm` (as in the example) before the next step to bring it back. The script supports A-Z, space and a hyphen.
+**Title card.** Copy `scripts/banner.py` from this skill's directory to the demo directory (`command cp -f`, since `cp` may be an interactive alias) and call it as `python3 banner.py "<name>" "<tagline>"`. It prints the name in 5-row block letters with a gradient, centered in the terminal, one row at a time, then the tagline. The gradient uses the terminal's own ANSI magentas, blues and cyans, so it follows the chosen theme (Catppuccin Mocha gives pink, blue and mint; Dracula pink, purple and cyan). For a project's brand colors pass `--colors '#f5c2e7,#cba6f7,#89b4fa'` (hex or 0-255 stops, left to right). It needs only Python 3. Use a name that fits: the art is 7 columns per letter and the terminal has about width ÷ 10 columns at font size 15-16, so 14 letters need about 100 columns (use the short name, for example `brewfile` for `brewfile-tools`, whose 105 columns would not fit at width 1000). Check the card's frame for contrast: a theme's cyan can be dark (GitHub Dark), so pick other `--colors` if the right-hand letters fade into the background. Set `PS1=` before drawing so no prompt shows under it. The script hides the cursor when it finishes, so run `tput cnorm` (as in the example) before the next step to bring it back. The script supports A-Z, space and a hyphen.
 
 ## Steps
 
@@ -147,6 +147,7 @@ For in-file comments, drop the `Type@25ms "# ..."` lines and put a `#` comment a
 | GIF jumps when it repeats | Open and end on the same title card |
 | A stray cursor block under the title card, or no cursor after it | The script hides the cursor; `tput cnorm` after the card restores it |
 | Plain or off-center title card, or a prompt under it | Use `scripts/banner.py` (centered, gradient); set `PS1=` for the title card |
+| Title card letters hard to read on the theme | Pass `--colors` with lighter stops |
 | Title card name wraps | Use a shorter name; the art is 7 columns per letter |
 | GIF written to the wrong place | Run `vhs` from the repo root; `Output` is relative to the working directory |
 | GIF too large for the README | Fewer commands, `Ctrl+L` between steps, smaller `Set Width`/`Set Height`, shorter `Sleep`s |
