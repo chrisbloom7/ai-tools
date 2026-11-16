@@ -1,0 +1,10 @@
+{
+  "name": "chrisbloom7-design",
+  "description": "Logo and brand asset tools",
+  "author": {
+    "name": "Chris Bloom"
+  },
+  "skills": [
+    "./skills/logo-package"
+  ]
+}

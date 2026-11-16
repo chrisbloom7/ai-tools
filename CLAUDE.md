@@ -1,7 +1,8 @@
 # CLAUDE.md
 
-`ai-tools` is a marketplace of personal Claude Code plugins. Today it holds one plugin,
-`chrisbloom7-development`, with the skills `worktree-start`, `parallel-workstreams` and `release`.
+`ai-tools` is a marketplace of personal Claude Code plugins. Today it holds two plugins:
+`chrisbloom7-development`, with the skills `worktree-start`, `parallel-workstreams` and `release`,
+and `chrisbloom7-design`, with the skill `logo-package`.
 
 ## Layout
 
@@ -33,6 +34,9 @@ aggregates them.
 - The skills in `chrisbloom7-development` assume the Worktrunk `wt` CLI and git. `release` also
   prefers `gh` or the GitHub MCP, but falls back to a compare URL. Other plugins may have different
   requirements.
+- `logo-package` (in `chrisbloom7-design`) ships Python scripts in `skills/logo-package/scripts/`
+  that need `uv`, `potrace` and Google Chrome; run its tests there with `uv run pytest`. This repo
+  is public: never commit real client logo art, outputs or a brand's `brand.toml`.
 - Rules cannot ship in a plugin, so the worktree skills carry short inline defaults and defer to the
   user's own worktree rules when those are loaded. Keep the defaults in `worktree-start`
   self-contained.
