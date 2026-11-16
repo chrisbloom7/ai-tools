@@ -195,16 +195,52 @@ def _union(elements: dict[str, segment.Element]) -> tuple[np.ndarray, tuple[int,
     return mask, (int(b[:, 0].min()), int(b[:, 1].min()), int(b[:, 2].max()), int(b[:, 3].max()))
 
 
+HELD_SHOWN = 20  # held files listed by name in a recovery message
+
+
+def _held_files(held: Path) -> str:
+    """The files in a held `.build-previous-<pid>` folder, by path relative to it."""
+    files = sorted(p.relative_to(held).as_posix() for p in held.rglob("*")
+                   if p.is_symlink() or not p.is_dir())
+    shown = ", ".join(files[:HELD_SHOWN]) or "nothing"
+    more = len(files) - HELD_SHOWN
+    return shown + (f" and {more} more" if more > 0 else "")
+
+
+def _move_back(held: Path) -> str:
+    """How to put the held files back by hand. report/ is not swapped as a folder (it holds the
+    user's own files), so a whole-folder move or replace would fail or lose them."""
+    return ("Move each file to the same path in the brand folder, replacing what is there. "
+            "`report/conversion-report.md` goes into the existing `report/` folder; never "
+            "replace the whole `report/` folder (it holds your own files). Then delete "
+            f"{held}.")
+
+
 def _check_interrupted(brand_dir: Path) -> None:
     """Refuse to build while a `.build-previous-<pid>` folder exists. A swap that was killed
     (SIGKILL, a second Ctrl-C) or could not roll back leaves the only copy of the earlier
     outputs there, so a build must never remove it."""
     left = sorted(p for p in brand_dir.iterdir() if INTERRUPTED.fullmatch(p.name))
     if left:
+        held = left[0]
+        others = f" (and {', '.join(str(p) for p in left[1:])})" if left[1:] else ""
         raise RuntimeError(
-            f"A previous build was interrupted and left {', '.join(str(p) for p in left)} "
-            "holding your earlier outputs. Move its contents back into the brand folder, or "
-            "delete it if you no longer need them, then build again.")
+            f"A previous build was interrupted and left {held}{others} holding your earlier "
+            f"outputs: {_held_files(held)}. If the brand folder already has a complete new "
+            "build (svg/, png/, logo-package/, README.md and report/conversion-report.md all "
+            "present, and their files newer than the files in this folder), this folder is "
+            "just the old copy: delete it. Otherwise, to get the earlier outputs back: "
+            f"{_move_back(held)} If you no longer need them, just delete it. Then build "
+            "again.")
+
+
+def _check_report_folder(brand_dir: Path) -> None:
+    """The build writes report/conversion-report.md, so report must be a folder (or absent)."""
+    rp = brand_dir / "report"
+    if _exists(rp) and not rp.is_dir():
+        raise RuntimeError(
+            f"{rp} is not a folder, but the build writes report/conversion-report.md into a "
+            "report/ folder. Move it out of the brand folder (or rename it), then build again.")
 
 
 def _remove_stale(brand_dir: Path) -> None:
@@ -230,20 +266,24 @@ def _remove(p: Path) -> None:
         p.unlink()
 
 
-def _prune(root: Path) -> None:
-    """Remove the empty folders under `root`, deepest first, then `root` if it is empty."""
+def _prune(root: Path, keep_root: bool = False) -> None:
+    """Remove the empty folders under `root`, deepest first, then `root` (unless `keep_root`)."""
     for d in sorted((p for p in root.rglob("*") if p.is_dir() and not p.is_symlink()),
                     key=lambda p: len(p.parts), reverse=True):
         try:
             d.rmdir()
         except OSError:
             pass
-    root.rmdir()
+    if not keep_root:
+        root.rmdir()
 
 
-def _swap(brand_dir: Path, staging: Path, previous: Path) -> None:
-    """Move the old MANAGED items into `previous`, then the staged ones into `brand_dir`. All
-    renames stay on one filesystem (both folders are inside `brand_dir`), so each is atomic.
+def _swap(brand_dir: Path, staging: Path, previous: Path, discard: Path) -> None:
+    """Move the old MANAGED items into `previous`, then the staged ones into `brand_dir`, then
+    rename `previous` to `discard` (which any later build may delete). All renames stay on one
+    filesystem (both folders are inside `brand_dir`), so each is atomic. The last rename is
+    inside the same try, so the only window in which `previous` outlives a complete swap is
+    between two renames.
 
     If anything fails or is interrupted, the rollback works from what is actually on disk (not
     from a record of finished renames, which an interrupt can leave one step behind): a new
@@ -262,7 +302,10 @@ def _swap(brand_dir: Path, staging: Path, previous: Path) -> None:
             if _exists(staging / name):
                 (brand_dir / name).parent.mkdir(parents=True, exist_ok=True)
                 os.rename(staging / name, brand_dir / name)
+        os.rename(previous, discard)  # done: the old outputs are now disposable
     except BaseException as exc:
+        if not _exists(previous) and _exists(discard):
+            raise  # interrupted after the last rename: the swap is complete, keep the new build
         stuck = []
         for name in MANAGED:
             here, old = brand_dir / name, previous / name
@@ -283,11 +326,12 @@ def _swap(brand_dir: Path, staging: Path, previous: Path) -> None:
             except OSError:
                 pass
         if stuck:  # keep `previous`: it holds the only copy of what could not be restored
+            _prune(previous, keep_root=True)  # drop empty folders (report/) left by the rollback
             raise RuntimeError(
                 f"the build failed while swapping in the new outputs ({exc!r}) and could not "
-                f"restore {', '.join(stuck)}. {previous} keeps your earlier outputs; a rebuild "
-                "will refuse to start until you move its contents back into the brand folder "
-                "or delete it.") from exc
+                f"restore {', '.join(stuck)}. {previous} keeps your earlier outputs: "
+                f"{_held_files(previous)}. {_move_back(previous)} A rebuild will refuse to "
+                "start until that folder is gone.") from exc
         _prune(previous)
         raise
 
@@ -317,12 +361,12 @@ def run(brand_dir: Path, config: Path | None = None, layout: str | None = None,
     settings = compose.load_settings(cfg_path)
     layout = layout or config_mod.layout_of(brand_dir, cfg_path)
     _check_interrupted(brand_dir)
+    _check_report_folder(brand_dir)
     _remove_stale(brand_dir)
     staging = brand_dir / f"{STAGING}{os.getpid()}"
     previous = brand_dir / f"{PREVIOUS}{os.getpid()}"
     discard = brand_dir / f"{DISCARD}{os.getpid()}"
     staging.mkdir()
-    swapped = False
     try:
         res = _build(staging, brand, data["elements"], cfg_path, settings, layout)
         if assessment is None:
@@ -331,17 +375,11 @@ def run(brand_dir: Path, config: Path | None = None, layout: str | None = None,
         from . import report
         # the documents describe brand_dir (paths, rebuild command) but are written to staging
         report.write_all(brand_dir, assessment, res, layout=layout, out=staging)
-        _swap(brand_dir, staging, previous)
-        swapped = True
+        _swap(brand_dir, staging, previous, discard)
     finally:
         shutil.rmtree(staging, ignore_errors=True)
-        if swapped:
-            # renamed first, so a kill while deleting leaves a folder the next build removes
-            try:
-                os.rename(previous, discard)
-            except OSError:
-                discard = previous
-            shutil.rmtree(discard, ignore_errors=True)
+        # the old outputs after a complete swap; whatever a kill leaves, the next build removes
+        shutil.rmtree(discard, ignore_errors=True)
     res.files = [brand_dir / p.relative_to(staging) for p in res.files]
     return res
 

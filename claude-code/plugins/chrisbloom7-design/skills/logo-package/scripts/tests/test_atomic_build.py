@@ -195,9 +195,41 @@ def test_a_build_refuses_to_start_while_an_interrupted_swap_holds_the_old_output
     assert cli.main(["build", str(tmp_path)]) == 1
     err = capsys.readouterr().err
     assert "A previous build was interrupted and left" in err and str(held) in err
-    assert "Move its contents back into the brand folder, or delete it" in err
+    flat = " ".join(err.split())
+    assert "svg/only-copy.svg" in flat  # the held files, listed by path
+    assert "Move each file to the same path in the brand folder, replacing what is there" in flat
+    assert "never replace the whole `report/` folder (it holds your own files)" in flat
+    # how to tell a complete swap that was only cut short before its old copy was deleted
+    assert ("If the brand folder already has a complete new build (svg/, png/, logo-package/, "
+            "README.md and report/conversion-report.md all present, and their files newer than "
+            "the files in this folder), this folder is just the old copy: delete it.") in flat
+    assert "move its contents back" not in flat.lower()
     assert "Traceback" not in err and "stop here" not in err
     assert _snapshot(tmp_path) == before  # nothing touched, not even the stale staging folder
+
+
+def test_the_held_file_list_is_capped(tmp_path, monkeypatch):
+    monkeypatch.setattr(deps, "check_tools", lambda: [])
+    cfg = _brand(tmp_path)
+    held = tmp_path / ".build-previous-9"
+    (held / "png").mkdir(parents=True)
+    for i in range(25):
+        (held / "png" / f"f{i:02d}.png").write_bytes(b"x")
+    with pytest.raises(RuntimeError) as e:
+        build.run(tmp_path, config=cfg)
+    msg = str(e.value)
+    assert "png/f19.png" in msg and "png/f20.png" not in msg and "and 5 more" in msg
+
+
+def test_a_report_that_is_not_a_folder_fails_before_any_work(tmp_path, monkeypatch):
+    monkeypatch.setattr(deps, "check_tools", lambda: [])
+    cfg = _brand(tmp_path, old=False)
+    (tmp_path / "report").write_text("not a folder")
+    before = _snapshot(tmp_path)
+    _stop(monkeypatch)
+    with pytest.raises(RuntimeError, match=r"report is not a folder.*Move it out"):
+        build.run(tmp_path, config=cfg)
+    assert _snapshot(tmp_path) == before
 
 
 def test_names_that_only_look_like_build_folders_are_never_touched(tmp_path, monkeypatch):
@@ -269,3 +301,60 @@ def test_a_failed_rollback_keeps_the_old_outputs_and_the_next_build_refuses(
     with pytest.raises(RuntimeError, match="A previous build was interrupted"):
         build.run(tmp_path, config=tmp_path / "tools" / "brand.toml")
     assert _snapshot(held) == held_before
+
+
+def _empty_dirs(root):
+    return [p for p in root.rglob("*") if p.is_dir() and not any(p.iterdir())]
+
+
+@pytest.mark.slow
+@NEEDS_BUILD
+def test_a_failed_rollback_of_the_report_lists_it_and_keeps_the_users_report_files(
+        tmp_path, monkeypatch, capsys):
+    _brand(tmp_path)
+    # rename 7 (moving png in) fails; the rollback's renames back are 8 (svg) to 12 (the
+    # report), and 12 fails: the old report stays held while report/ keeps the user's files
+    calls = _flaky_rename(monkeypatch, tmp_path, {7, 12})
+    assert cli.main(["build", str(tmp_path)]) == 1
+    err = " ".join(capsys.readouterr().err.split())
+    held = tmp_path / f".build-previous-{os.getpid()}"
+    assert calls[11][0] == held / "report" / "conversion-report.md"
+    assert "report/conversion-report.md" in err and str(held) in err
+    assert "`report/conversion-report.md` goes into the existing `report/` folder" in err
+    assert "move its contents back" not in err.lower()
+    assert (held / "report/conversion-report.md").read_bytes() == OLD["report/conversion-report.md"]
+    for rel, data in USER_REPORT.items():
+        assert (tmp_path / rel).read_bytes() == data, rel
+    assert _empty_dirs(held) == []
+
+
+@pytest.mark.slow
+@NEEDS_BUILD
+def test_a_failed_rollback_prunes_empty_folders_but_keeps_the_held_folder(tmp_path,
+                                                                          monkeypatch):
+    cfg = _brand(tmp_path)
+    # rename 7 fails, then 8 (putting svg back) fails; the report goes back, leaving the held
+    # report/ folder empty
+    _flaky_rename(monkeypatch, tmp_path, {7, 8})
+    with pytest.raises(RuntimeError, match="keeps your earlier outputs"):
+        build.run(tmp_path, config=cfg)
+    held = tmp_path / f".build-previous-{os.getpid()}"
+    assert held.is_dir() and (held / "svg" / "old.svg").read_bytes() == OLD["svg/old.svg"]
+    assert not (held / "report").exists()
+    assert _empty_dirs(held) == []
+
+
+@pytest.mark.slow
+@NEEDS_BUILD
+def test_a_failed_final_rename_rolls_back_instead_of_keeping_a_half_finished_swap(
+        tmp_path, monkeypatch, capsys):
+    _brand(tmp_path)
+    before = _snapshot(tmp_path)
+    # renames 1 to 5 move the old items aside, 6 to 10 move the new ones in, and 11 marks the
+    # old copy disposable (.build-previous-<pid> to .build-discard-<pid>)
+    calls = _flaky_rename(monkeypatch, tmp_path, 11)
+    assert cli.main(["build", str(tmp_path)]) == 1
+    assert calls[10][1].name.startswith(".build-discard-")
+    assert "left untouched" in capsys.readouterr().err
+    assert _snapshot(tmp_path) == before
+    assert _leftovers(tmp_path) == []
