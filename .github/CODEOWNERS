@@ -2,3 +2,10 @@
 /.claude/ @chrisbloom7
 /CLAUDE.md @chrisbloom7
 /.github/CODEOWNERS @chrisbloom7
+
+# Workflows, scripts and dependabot config run with the repo's permissions.
+/.github/ @chrisbloom7
+
+# Marketplace and plugin manifests and SKILL.md files are installed by users and steer their Claude.
+/.claude-plugin/ @chrisbloom7
+/claude-code/plugins/ @chrisbloom7
