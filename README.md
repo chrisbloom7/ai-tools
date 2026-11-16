@@ -35,4 +35,4 @@ Worktree and release workflow tools.
 | `chrisbloom7-development:parallel-workstreams` | On explicit request: plan and orchestrate multiple parallel worktree sessions |
 | `chrisbloom7-development:release` | Cut a release: validate, rotate the CHANGELOG, open the release PR, then tag after the owner merges. Project specifics come from a per-project overlay |
 
-> Requires [worktrunk CLI](https://worktrunk.dev). `release` also needs `gh` and GNU date (`gdate` on macOS).
+> Requires [worktrunk CLI](https://worktrunk.dev). `release` works best with `gh` (it opens the PR; without it you get a compare URL).

@@ -1,7 +1,7 @@
 ---
 name: release
-description: Cut a versioned release of a project - validate preconditions and the version, rotate the CHANGELOG, open a release PR, then (after the owner merges) tag and run post-release steps such as a Homebrew tap bump. Use when the user asks to "cut a release", "release vX.Y.Z", "bump the version", "tag a release", "publish a new version" or "handle the tag". Reads project-specific "release parameters" from a thin per-project overlay (see the Overlay contract). Requires worktrunk CLI, git and gh.
-compatibility: Requires worktrunk CLI (https://worktrunk.dev), git, gh and GNU date (gdate on macOS)
+description: Cut a versioned release of a project - validate preconditions and the version, rotate the CHANGELOG, open a release PR, then (after the owner merges) tag and run post-release steps such as a Homebrew tap bump. Use when the user asks to "cut a release", "release vX.Y.Z", "bump the version", "tag a release", "publish a new version" or "handle the tag". Reads project-specific "release parameters" from a thin per-project overlay (see the Overlay contract). Requires worktrunk CLI and git; gh is recommended.
+compatibility: Requires worktrunk CLI (https://worktrunk.dev) and git; gh is recommended for opening PRs
 ---
 
 # Release
@@ -66,7 +66,7 @@ Run each item in the overlay's `audit` list (help text vs docs, README, SECURITY
 If `changelog` is `keep-a-changelog` (the default):
 
 1. Read `CHANGELOG.md` and confirm there is content under `## [Unreleased]`; if empty, warn the owner before proceeding.
-2. Replace the `## [Unreleased]` heading with an empty `## [Unreleased]` followed by `## [X.Y.Z] - YYYY-MM-DD`, moving the existing content under the new heading unchanged. The date is `gdate +%F`.
+2. Replace the `## [Unreleased]` heading with an empty `## [Unreleased]` followed by `## [X.Y.Z] - YYYY-MM-DD`, moving the existing content under the new heading unchanged. The date is `date +%F`.
 3. If the overlay names a `version_file`, write the version there in the exact form the overlay specifies (usually no `v`).
 
 If `changelog` is `none`, skip the CHANGELOG edit.
@@ -79,6 +79,8 @@ Flow `release-branch`: stage only the files changed (CHANGELOG, version file, do
 git push -u origin <branch_name>          # never the base branch
 gh pr create --base <base_branch> --title "<pr_title>" --body "<body>"
 ```
+
+If `gh` is not installed, push the branch and give the owner the GitHub compare URL (`https://github.com/<owner>/<repo>/compare/<base_branch>...<branch_name>`) with the title and body to paste.
 
 Flow `promote`: push nothing; open the PR with head `head_branch` and base `base_branch`.
 
