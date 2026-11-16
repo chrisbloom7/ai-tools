@@ -14,20 +14,20 @@ Ask these together, with the defaults, before writing anything. Skip a question 
 
 1. **Comment style.** Default: **on screen**, typed into the terminal as `# ...` shell comments before each command, so the person reading the README sees them. Alternative: **in file**, `#` comments in the tape only, above each command; they do not appear in the GIF.
 2. **Theme.** Default: `Catppuccin Mocha`. `Dracula` has the most clearly separated colors (good for colorful output such as `jq`, `git log` and diffs); `TokyoNight` is the other dark option. `vhs themes` lists all of them.
-3. **Title card.** Default: **yes**. A banner with the project name and a one-line tagline, shown at the start and again at the end, so the GIF loops without a jump.
+3. **Title card.** Default: **yes**. A banner with the project name in big gradient block letters and a one-line tagline, revealed row by row at the start and shown again at the end, so the GIF loops without a jump.
 4. **Window decorations.** Default: **no**. Alternative: `Set WindowBar Colorful`, `Set Margin 30` with `Set MarginFill "#674EFF"`, `Set BorderRadius 8`.
 
 ## Tape format (required)
 
 - **Cover the workflow.** List the commands in the README's first usage block. Every one appears in the tape, unless the user agrees to drop it. Show both halves of paired features (for example `add` and `remove`).
-- **Short:** 4-8 visible commands, about 30 seconds in total including the title card.
+- **Short:** 4-8 visible commands, about 35 seconds in total including the title cards (2-3 seconds each).
 - **One blank line between commands.** Each command is a group of lines (comment, `Type`, `Enter`, `Sleep`); groups are separated by exactly one empty line.
 - **A comment before every command** explaining what it does, in plain words, in the chosen style. With in-file comments, the settings and the `Hide`/`Show` setup get a `#` comment too.
 - **A header comment** at the top of the file: what the demo shows, any stubbed programs, how to regenerate it (`vhs docs/demo.tape`, run from the repo root, re-render whenever the CLI output it shows changes) and what it avoids touching.
 - **Clear the screen** with `Ctrl+L` before each step after the first, so output does not scroll off and the GIF stays small.
 - **`Sleep 500ms` before `Enter`** after each typed command, then a `Sleep` long enough to read the output.
 
-This example is adapted from a tape rendered with vhs 0.12.1. `banner.txt` is written by the setup (a seed script, or a `printf` in the `Hide` block):
+This example is adapted from a tape rendered with vhs 0.12.1. `banner.py` is this skill's `scripts/banner.py`, copied next to the tape:
 
 ```tape
 # README demo: find a past session by one word, read it in context, resume it. Needs `vhs`.
@@ -55,9 +55,9 @@ Set Theme "Catppuccin Mocha"
 # Hidden setup: demo home, stubs first on the PATH, and a banner() that draws the title card
 Env HOME "/tmp/mytool-demo"
 Hide
-Type "export PATH=$PWD/bin:/tmp/mytool-demo/bin:$PATH && cd /tmp/mytool-demo/work"
+Type "export REPO=$PWD PATH=$PWD/bin:/tmp/mytool-demo/bin:$PATH && cd /tmp/mytool-demo/work"
 Enter
-Type `banner() { clear; printf '%b' "$(cat /tmp/mytool-demo/banner.txt)"; }`
+Type `banner() { clear; python3 $REPO/docs/demo/banner.py "mytool" "Search your past sessions"; }`
 Enter
 Type "PS1= && banner"
 Enter
@@ -94,7 +94,9 @@ Show
 Sleep 2500ms
 ```
 
-For in-file comments, drop the `Type@25ms "# ..."` lines and put a `#` comment above each group instead. For a banner, use big-letter art from `figlet` or `toilet` if either is installed; otherwise a box with the name and tagline, padded in the seed script so the right border lines up. Set `PS1=` for the title card so no prompt shows below it. `Type` accepts backticks around text that contains double quotes; `\"` is not valid.
+For in-file comments, drop the `Type@25ms "# ..."` lines and put a `#` comment above each group instead. `Type` accepts backticks around text that contains double quotes; `\"` is not valid.
+
+**Title card.** Copy `scripts/banner.py` from this skill's directory to the demo directory (`command cp -f`, since `cp` may be an interactive alias) and call it as `python3 banner.py "<name>" "<tagline>"`. It prints the name in 5-row block letters with a magenta-to-cyan gradient, centered in the terminal, one row at a time, then the tagline. It needs only Python 3. Use a name that fits: the art is 7 columns per letter and the terminal has about width ÷ 10 columns at font size 15-16, so 14 letters need about 100 columns (use the short name, for example `brewfile` for `brewfile-tools`, whose 105 columns would not fit at width 1000). Set `PS1=` before drawing so no prompt shows under it. The script supports A-Z, space and a hyphen.
 
 ## Steps
 
@@ -143,7 +145,8 @@ For in-file comments, drop the `Type@25ms "# ..."` lines and put a `#` comment a
 | No blank line between commands | Separate every command group with one empty line |
 | Output scrolls off or runs into the next prompt | `Ctrl+L` before each step; end `cat` with `; echo` |
 | GIF jumps when it repeats | Open and end on the same title card |
-| Banner border misaligned, or a prompt shows under it | Pad the box in the seed script; set `PS1=` for the title card |
+| Plain or off-center title card, or a prompt under it | Use `scripts/banner.py` (centered, gradient); set `PS1=` for the title card |
+| Title card name wraps | Use a shorter name; the art is 7 columns per letter |
 | GIF written to the wrong place | Run `vhs` from the repo root; `Output` is relative to the working directory |
 | GIF too large for the README | Fewer commands, `Ctrl+L` between steps, smaller `Set Width`/`Set Height`, shorter `Sleep`s |
 | Alt text just says "Demo" | Describe what the GIF shows |
