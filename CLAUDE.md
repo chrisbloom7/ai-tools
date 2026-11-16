@@ -1,8 +1,8 @@
 # CLAUDE.md
 
 `ai-tools` is a marketplace of personal Claude Code plugins. Today it holds two plugins:
-`chrisbloom7-development`, with the skills `worktree-start`, `parallel-workstreams` and `release`,
-and `chrisbloom7-design`, with the skill `logo-package`.
+`chrisbloom7-development`, with the skills `worktree-start`, `parallel-workstreams`, `release` and
+`vhs-demo`, and `chrisbloom7-design`, with the skill `logo-package`.
 
 ## Layout
 
