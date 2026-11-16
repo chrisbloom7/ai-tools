@@ -27,7 +27,7 @@ A marketplace plugin for Claude Code providing development workflow skills.
 
 ### `chrisbloom7-development` plugin
 
-Development workflow tools for worktree-based feature development.
+Worktree and release workflow tools.
 
 | Skill | Description |
 |-------|-------------|
@@ -35,4 +35,4 @@ Development workflow tools for worktree-based feature development.
 | `chrisbloom7-development:parallel-workstreams` | On explicit request: plan and orchestrate multiple parallel worktree sessions |
 | `chrisbloom7-development:release` | Cut a release: validate, rotate the CHANGELOG, open the release PR, then tag after the owner merges. Project specifics come from a per-project overlay |
 
-> Requires [worktrunk CLI](https://worktrunk.dev).
+> Requires [worktrunk CLI](https://worktrunk.dev). `release` opens its PR with `gh` or the GitHub MCP; with neither you get a compare URL.
