@@ -34,7 +34,7 @@ A marketplace plugin for Claude Code providing development workflow skills.
 
 ### `chrisbloom7-development` plugin
 
-Worktree and release workflow tools.
+Worktree, release and demo workflow tools.
 
 | Skill | Description |
 |-------|-------------|
