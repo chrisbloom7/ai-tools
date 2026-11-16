@@ -116,21 +116,19 @@ Write a `WORKTREE_CONTEXT.md` file in the new worktree root. This file is the pr
 [Design decisions, context from related work, anything the new session needs to know]
 ```
 
-Set `auto_load=true` as the default, then run the check — if the file is not referenced,
-override it to `false`:
-
-**After writing the file, check whether it will be auto-loaded.** Look for a line
-containing `@@WORKTREE_CONTEXT.md` in either `CLAUDE.md` or `CLAUDE.local.md` in the
-worktree root:
+**After writing the file, check whether it will be auto-loaded.** Start with
+`auto_load=true` as the default. Then look for a line containing `@@WORKTREE_CONTEXT.md` in
+either `CLAUDE.md` or `CLAUDE.local.md` in the worktree root:
 
 ```bash
 grep -l "@@WORKTREE_CONTEXT.md" CLAUDE.md CLAUDE.local.md 2>/dev/null
 ```
 
-- **If a match is found:** the file will be auto-loaded — no further action needed here.
-- **If no match is found:** set a flag (`auto_load=false`) that Step 5 will use to
-  adjust the kickoff prompt. Do not create or modify `CLAUDE.md` / `CLAUDE.local.md`
-  yourself — that is the user's configuration to own.
+- **If a match is found:** the file will be auto-loaded. Leave `auto_load=true`; no further
+  action is needed here.
+- **If no match is found:** set `auto_load=false`, which Step 5 uses to adjust the kickoff
+  prompt. Do not create or modify `CLAUDE.md` / `CLAUDE.local.md` yourself — that is the
+  user's configuration to own.
 
 ### Step 5 — Open a Session in the Worktree
 
@@ -147,8 +145,18 @@ If `$TMUX` is NOT set but tmux is available (`test -n "$(command -v tmux 2>/dev/
 window_name="<short-identifier>"
 worktree_path="<absolute-path-to-worktree>"
 
+# Resolve tmux to an absolute path once (Claude Code's shell has a restricted PATH,
+# so a bare `tmux` may not resolve; this works on Apple Silicon, Intel macOS and Linux)
+tmux_bin=$(command -v tmux 2>/dev/null)
+if [ -z "$tmux_bin" ]; then
+  for candidate in /opt/homebrew/bin/tmux /usr/local/bin/tmux /usr/bin/tmux /bin/tmux; do
+    [ -x "$candidate" ] && tmux_bin=$candidate && break
+  done
+fi
+[ -n "$tmux_bin" ] || { echo "tmux not found" >&2; exit 1; }
+
 # Create window and cd into worktree
-/opt/homebrew/bin/tmux new-window -c "$worktree_path" -n "$window_name"
+"$tmux_bin" new-window -c "$worktree_path" -n "$window_name"
 
 # Send kickoff prompt — MUST escape with printf %q to handle
 # apostrophes, ?, $, and other special characters safely
@@ -158,11 +166,11 @@ else
   kickoff="Hey Claude, do you know what we're working on?"
 fi
 escaped=$(printf %q "$kickoff")
-/opt/homebrew/bin/tmux send-keys -t "$window_name" "claude $escaped" Enter
+"$tmux_bin" send-keys -t "$window_name" "claude $escaped" Enter
 ```
 
 **Critical tmux caveats:**
-- Claude Code's bash shell has a restricted PATH — always use full paths: `/opt/homebrew/bin/tmux`, `/bin/cat`, `/usr/bin/tr`
+- Claude Code's bash shell has a restricted PATH — always call tmux through the absolute path in `$tmux_bin` (resolved above) and use full paths for other tools, e.g. `/bin/cat`, `/usr/bin/tr`. Reuse `$tmux_bin` in later commands, such as `"$tmux_bin" list-sessions`
 - **Always use `printf %q`** to escape the kickoff prompt before `send-keys`. Apostrophes in the prompt (e.g., "we're") break single-quoted strings and expose `?` as a zsh glob pattern.
 - Multi-line prompts must be flattened before send-keys — newlines cause premature Enter: `prompt=$(/bin/cat /tmp/kickoff.txt | /usr/bin/tr '\n' ' ')`
 - Test on one window before looping when creating multiple windows
@@ -227,7 +235,7 @@ you lose isolation and git operations (diff, status, review) become confusing.
 
 ## What This Skill Does NOT Do
 
-- **Merge or PR management** — use `wt merge` or your project's PR skill for that
+- **Merge or PR management** — open a PR for the owner to merge (via your project's PR skill or `gh pr create`); never run `wt merge`
 - **Project-specific pre-flight** (Docker, services, auth) — handled by project-specific companion skills
 - **Worktree cleanup** — use worktrunk directly (`wt remove`) or a finishing skill
 
