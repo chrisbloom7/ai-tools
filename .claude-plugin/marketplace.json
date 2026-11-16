@@ -4,13 +4,18 @@
     "name": "Chris Bloom"
   },
   "metadata": {
-    "description": "Development workflow skills for Claude Code"
+    "description": "Development workflow and design skills for Claude Code"
   },
   "plugins": [
     {
       "name": "chrisbloom7-development",
       "source": "./claude-code/plugins/chrisbloom7-development",
       "description": "Worktree, release and demo workflow tools"
+    },
+    {
+      "name": "chrisbloom7-design",
+      "source": "./claude-code/plugins/chrisbloom7-design",
+      "description": "Logo and brand asset tools"
     }
   ]
 }

@@ -1,0 +1,19 @@
+[project]
+name = "logo-pipeline"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.5.5",
+    "pillow>=13.0.0",
+    "scipy>=1.18.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = ["slow: builds outputs with Chrome and potrace (slow)"]

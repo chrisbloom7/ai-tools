@@ -13,19 +13,23 @@ ai-tools/
 ├── .github/              # CI workflow, validation script, CODEOWNERS, Dependabot
 ├── claude-code/          # Claude Code marketplace plugins
 │   └── plugins/
-│       └── chrisbloom7-development/
+│       ├── chrisbloom7-development/
+│       │   ├── .claude-plugin/plugin.json
+│       │   └── skills/
+│       │       ├── worktree-start
+│       │       ├── parallel-workstreams
+│       │       ├── release
+│       │       └── vhs-demo
+│       └── chrisbloom7-design/
 │           ├── .claude-plugin/plugin.json
 │           └── skills/
-│               ├── worktree-start
-│               ├── parallel-workstreams
-│               ├── release
-│               └── vhs-demo
+│               └── logo-package/     # SKILL.md and scripts/ (Python, run with uv)
 └── ...                   # Future ecosystems (ChatGPT, Copilot, etc.)
 ```
 
 ## Claude Code
 
-A marketplace plugin for Claude Code providing development workflow skills.
+A Claude Code marketplace with development workflow and design skills.
 
 **Install:**
 ```
@@ -44,3 +48,13 @@ Worktree, release and demo workflow tools.
 | `chrisbloom7-development:vhs-demo` | Write a short VHS tape (commented commands, blank-line separated), render the GIF and embed it in the README |
 
 > Requires [worktrunk CLI](https://worktrunk.dev). `release` opens its PR with `gh` or the GitHub MCP; with neither you get a compare URL. `vhs-demo` needs the [vhs CLI](https://github.com/charmbracelet/vhs).
+
+### `chrisbloom7-design` plugin
+
+Logo and brand asset tools.
+
+| Skill | Description |
+|-------|-------------|
+| `chrisbloom7-design:logo-package` | Convert raster logo art (PNG) into a brand asset package: SVG lockups and marks, vector PDFs, PNGs, favicons and app icons, with a preflight grade and a conversion report. Does not design or redraw logos |
+
+> Requires [uv](https://docs.astral.sh/uv/), [potrace](https://potrace.sourceforge.net/) and Google Chrome (`brew install uv potrace`). Tested on macOS; Linux is untested (Chrome or Chromium on `PATH` or via `LOGO_PIPELINE_CHROME`); Windows is unsupported. Tests: `cd claude-code/plugins/chrisbloom7-design/skills/logo-package/scripts && uv run pytest`.
