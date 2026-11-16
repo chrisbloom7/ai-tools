@@ -1,12 +1,13 @@
 {
   "name": "chrisbloom7-development",
-  "description": "Worktree and release workflow tools",
+  "description": "Worktree, release and demo workflow tools",
   "author": {
     "name": "Chris Bloom"
   },
   "skills": [
     "./skills/worktree-start",
     "./skills/parallel-workstreams",
-    "./skills/release"
+    "./skills/release",
+    "./skills/vhs-demo"
   ]
 }
