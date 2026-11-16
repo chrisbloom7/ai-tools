@@ -1,8 +1,13 @@
-"""Build every output from the source art: svg/, png/ and the logo-package/ handoff folder.
+"""Build every output from the source art: svg/, png/, the logo-package/ handoff folder and
+the three documents (README.md, logo-package/README.txt, report/conversion-report.md).
 
   from logo_pipeline import build
   result = build.run(Path("."))                     # config: tools/brand.toml (config.BRAND)
   result = build.run(brand_dir, config=Path("..."))  # another logo
+
+The build is all or nothing: everything is built into a staging folder inside the brand folder
+and swapped into place only when the build, the lockup verification and the documents all
+succeed. A failed build leaves the previous outputs exactly as they were.
 
 What is built comes from brand.toml (see `config.load_brand`): one set of outputs per
 `[variants.<name>]` table, named after the variant; the mark is `[brand] mark_element`, written
@@ -24,6 +29,7 @@ Owner decisions applied here (the spec left them open):
 - Never one-color, CMYK, EPS or AI files.
 """
 
+import os
 import re
 import shutil
 import tomllib
@@ -33,7 +39,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from . import compose, deps, minify, render, segment, verify
+from . import assess, compose, deps, minify, render, segment, verify
 from . import config as config_mod
 from .variants import SharedReport
 
@@ -52,6 +58,11 @@ SAFE_R = 0.39
 SHARE_H = 540
 WHITE = "#ffffff"
 OUT_DIRS = ("svg", "png", "logo-package")
+# Everything a build writes into the brand folder, replaced as a whole on success. Nothing else
+# in the brand folder (source/, brand.toml, tools/, the user's own files) is touched.
+MANAGED = (*OUT_DIRS, "report", "README.md")
+STAGING = ".build-staging-"  # + pid: the new outputs, built here
+PREVIOUS = ".build-previous-"  # + pid: the old outputs, moved here during the swap
 
 
 @dataclass
@@ -179,31 +190,117 @@ def _union(elements: dict[str, segment.Element]) -> tuple[np.ndarray, tuple[int,
     return mask, (int(b[:, 0].min()), int(b[:, 1].min()), int(b[:, 2].max()), int(b[:, 3].max()))
 
 
-def run(brand_dir: Path, config: Path | None = None, layout: str | None = None) -> BuildResult:
-    """Build every output under `brand_dir` from the brand.toml at `config` (default:
-    `config.BRAND`, the one next to the package). Sources resolve against `brand_dir`.
-    `layout` (config.LAYOUT_TOOLS or LAYOUT_SKILL; default: from where `config` sits, see
-    `config.layout_of`) is recorded on the result for the documents. Raises RuntimeError,
-    before deleting anything, when Chrome or potrace is missing (deps.check_tools)."""
+def _remove_stale(brand_dir: Path) -> None:
+    """Remove staging and previous folders left by a build that crashed or was killed. They
+    are ours (STAGING and PREVIOUS plus a pid), never the user's. Two builds of one brand folder
+    at the same time are not supported."""
+    for prefix in (STAGING, PREVIOUS):
+        for p in brand_dir.glob(f"{prefix}*"):
+            if p.is_dir() and not p.is_symlink():
+                shutil.rmtree(p, ignore_errors=True)
+            else:
+                p.unlink(missing_ok=True)
+
+
+def _remove(p: Path) -> None:
+    if p.is_dir() and not p.is_symlink():
+        shutil.rmtree(p)
+    else:
+        p.unlink()
+
+
+def _swap(brand_dir: Path, staging: Path, previous: Path) -> None:
+    """Move the old MANAGED items into `previous`, then the staged ones into `brand_dir`. All
+    renames stay on one filesystem (both folders are inside `brand_dir`), so each is atomic.
+    If any rename fails, the new items already moved in are removed, the old ones are moved
+    back, and the error is raised again."""
+    previous.mkdir()
+    aside: list[str] = []  # old items moved into `previous`
+    placed: list[str] = []  # new items moved into `brand_dir`
+    try:
+        for name in MANAGED:
+            if (brand_dir / name).exists() or (brand_dir / name).is_symlink():
+                os.rename(brand_dir / name, previous / name)
+                aside.append(name)
+        for name in MANAGED:
+            if (staging / name).exists():
+                os.rename(staging / name, brand_dir / name)
+                placed.append(name)
+    except BaseException:
+        stuck = []
+        for name in placed:
+            try:
+                _remove(brand_dir / name)
+            except OSError:
+                stuck.append(name)
+        for name in reversed(aside):
+            try:
+                os.rename(previous / name, brand_dir / name)
+            except OSError:
+                stuck.append(name)
+        if stuck:  # keep `previous` so nothing is lost; say where the old outputs are
+            raise RuntimeError(
+                f"the build failed while swapping in the new outputs and could not restore "
+                f"{', '.join(stuck)}; the previous outputs are in {previous}: move them back "
+                "before building again (the next build removes that folder)")
+        previous.rmdir()
+        raise
+
+
+def run(brand_dir: Path, config: Path | None = None, layout: str | None = None,
+        assessment: assess.Assessment | None = None) -> BuildResult:
+    """Build every output and the three documents under `brand_dir` from the brand.toml at
+    `config` (default: `config.BRAND`, the one next to the package). Sources resolve against
+    `brand_dir`. `layout` (config.LAYOUT_TOOLS or LAYOUT_SKILL; default: from where `config`
+    sits, see `config.layout_of`) is recorded on the result for the documents. `assessment`
+    (`assess.assess` of the sources) goes into the documents; default: assessed here.
+
+    Raises RuntimeError, before any work, when Chrome or potrace is missing (deps.check_tools).
+    Everything is built into a staging folder inside `brand_dir` and swapped into place (see
+    MANAGED) only when the build, the verification and the documents all succeed; on any
+    failure the previous outputs are left untouched and the error is raised."""
     missing = [t for t in deps.check_tools() if t in ("chrome", "potrace")]
-    if missing:  # before anything is deleted
+    if missing:  # before any work
         hints = "; ".join(f"{t}: {deps.INSTALL_HINTS[t]}" for t in missing)
         raise RuntimeError(f"cannot build: missing {', '.join(missing)} ({hints})")
     brand_dir = Path(brand_dir)
     cfg_path = Path(config or config_mod.BRAND)
     brand = config_mod.load_brand(brand_dir, cfg_path)
     data = tomllib.loads(cfg_path.read_text())
-    config_mod.check_tables(data)  # before any output is deleted
-    rules = data["elements"]
+    config_mod.check_tables(data)  # before any work
     settings = compose.load_settings(cfg_path)
-    for d in OUT_DIRS:
-        shutil.rmtree(brand_dir / d, ignore_errors=True)
-    svg_dir, png_dir = brand_dir / "svg", brand_dir / "png"
-    pkg = brand_dir / "logo-package"
+    layout = layout or config_mod.layout_of(brand_dir, cfg_path)
+    _remove_stale(brand_dir)
+    staging = brand_dir / f"{STAGING}{os.getpid()}"
+    previous = brand_dir / f"{PREVIOUS}{os.getpid()}"
+    staging.mkdir()
+    swapped = False
+    try:
+        res = _build(staging, brand, data["elements"], cfg_path, settings, layout)
+        if assessment is None:
+            assessment = assess.assess([v.source for v in brand.variants.values()])
+        # imported here: report imports this module at load time
+        from . import report
+        # the documents describe brand_dir (paths, rebuild command) but are written to staging
+        report.write_all(brand_dir, assessment, res, layout=layout, out=staging)
+        _swap(brand_dir, staging, previous)
+        swapped = True
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+        if swapped:
+            shutil.rmtree(previous, ignore_errors=True)
+    res.files = [brand_dir / p.relative_to(staging) for p in res.files]
+    return res
+
+
+def _build(out: Path, brand: config_mod.Brand, rules: dict, cfg_path: Path,
+           settings: compose.Settings, layout: str) -> BuildResult:
+    """Build every output into `out` (an empty folder); raise when a lockup fails verify."""
+    svg_dir, png_dir = out / "svg", out / "png"
+    pkg = out / "logo-package"
     for d in (svg_dir, png_dir, pkg / "svg", pkg / "pdf", pkg / "png"):
         d.mkdir(parents=True)
-    res = BuildResult(brand=brand, config=cfg_path, settings=settings,
-                      layout=layout or config_mod.layout_of(brand_dir, cfg_path))
+    res = BuildResult(brand=brand, config=cfg_path, settings=settings, layout=layout)
     if brand.mark_element is None:
         res.notes.append(NO_MARK_NOTE)
 

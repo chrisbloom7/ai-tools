@@ -95,4 +95,5 @@ def test_logo_package_is_built_from_the_variants(built):
         "logo-package/png/email-header-default-1200.png",
         "logo-package/png/icon-default-512.png",
         "logo-package/png/icon-default-192.png",
+        "logo-package/README.txt",  # build.run writes the documents too
     }
