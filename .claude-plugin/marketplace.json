@@ -10,7 +10,7 @@
     {
       "name": "chrisbloom7-development",
       "source": "./claude-code/plugins/chrisbloom7-development",
-      "description": "Worktree and release workflow tools"
+      "description": "Worktree, release and demo workflow tools"
     },
     {
       "name": "chrisbloom7-design",
