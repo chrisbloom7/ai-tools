@@ -1,6 +1,6 @@
 ---
 name: parallel-workstreams
-description: Plan and orchestrate multiple parallel worktree development sessions. Use this skill when the user wants to work on multiple features, issues, stories, or tasks simultaneously — e.g., "let's work on these 3 stories in parallel", "spin up workstreams for these tickets", "I want to parallelize this work", or provides multiple issue IDs and expects concurrent development. Also use when they mention "parallel development", "multiple worktrees at once", or "batch these tasks". Requires worktrunk CLI.
+description: Plan and orchestrate several parallel worktree sessions. Use ONLY when the user explicitly asks for parallel workstreams or multiple worktrees at once (for example "set up parallel workstreams for these tickets"), or invokes this skill by name. Do not use it just because several tasks were mentioned. Requires worktrunk CLI.
 compatibility: Requires worktrunk CLI (https://worktrunk.dev), git, and the worktree-start skill
 ---
 
@@ -31,30 +31,18 @@ Gather all tasks the user wants to parallelize:
 
 Before creating any worktrees:
 
-**Repo worktree check** — confirm the repo is set up for worktree development:
-- `~/.config/worktrunk/config.toml` exists, OR
-- `.worktrees/` directory exists at the repo root, OR
-- `CLAUDE.md` mentions worktrees or worktrunk
+The user's own worktree rules, and the defaults in `worktree-start` ("The user's own worktree rules
+come first"), apply to every workstream here. Do not restate them per task.
 
-If none of these are present, flag it before proceeding: "This repo doesn't appear to use worktrees yet. Parallel development will require them — want to proceed?" Stop if the user declines.
+**Worktree setup check** — confirm worktrunk is installed and `wt config show` has a `worktree-path`
+template (see `worktree-start` Prerequisites). If not, say so before proceeding and stop if the user
+declines to fix it.
 
 Then run the following checks:
 
-1. **Main branch currency** — Before creating any worktrees, check whether the main
-   branch is behind its remote:
-
-   ```bash
-   git fetch --quiet
-   behind=$(git rev-list --count HEAD..@{u} 2>/dev/null)
-   ```
-
-   - If `behind` is `0` (or the command errors because there is no upstream), proceed.
-   - If `behind` is non-zero, **stop and ask the user:**
-     > "Your main branch is `$behind` commit(s) behind its remote. Pull before creating
-     > worktrees? (Recommended — all workstreams will branch from the stale base
-     > otherwise.)"
-     - If yes: run `git pull` and verify success before continuing.
-     - If no: note in the Step 5 report that all worktrees were created from a stale base.
+1. **Base branch currency** — Run the stale-base check from `worktree-start` Step 3 once, before
+   creating any worktrees (including its `--ff-only` update and its question to the user). If the user
+   chooses not to update, note in the Step 5 report that all worktrees were created from a stale base.
 
 2. **Project prerequisites** — Check for project-specific companion skills (same extensibility mechanism as `worktree-start`). If one exists, invoke it for pre-flight checks: services that need to be running, authentication that needs to be valid, etc. Run these once, not per-worktree.
 
@@ -97,10 +85,9 @@ After approval, create each workstream sequentially using the `worktree-start` w
 2. Write `WORKTREE_CONTEXT.md` — include ordering constraints from Step 2 if applicable, and include a **"Before You Begin"** section as the first action item for the worktree agent:
    > Validate this context file and the implementation plan. Check for incorrect assumptions that may have introduced gaps or could lead to errors in production. Do not make any changes to either document. Report your findings, then stop. Do not start work until given explicit approval.
 
-   After writing the file, check for `@@WORKTREE_CONTEXT.md` in `CLAUDE.md` or
-   `CLAUDE.local.md` (see `worktree-start` Step 4 for the exact grep command). If not
-   found, set `auto_load=false` for this worktree — item 4 will adjust the kickoff
-   prompt accordingly.
+   After writing the file, check whether it is auto-loaded (see `worktree-start` Step 4 for the
+   exact grep command). If not, set `auto_load=false` for this worktree — item 4 will adjust the
+   kickoff prompt accordingly.
 3. Open the session window using the multiplexer (see `worktree-start` Step 5 for the exact tmux/zellij/fallback commands, session name, and path conventions).
 4. **Send the kickoff prompt** — this is the step most commonly missed. Immediately after creating the window, send `claude <kickoff-prompt>` via `send-keys` (tmux) or equivalent. Do not skip this step. Verify the first window received the prompt before creating the remaining worktrees.
 
@@ -134,7 +121,8 @@ Include:
 - **Execute the actual development work** — each worktree session handles its own task independently
 - **Manage PRs or merges** — use project-specific PR/merge skills
 - **Monitor progress across streams** — the user manages each session independently
-- **Worktree cleanup** — use worktrunk directly or a finishing skill
+- **Worktree cleanup** — follow the user's removal rules or the project's cleanup skill (see
+  `worktree-start`)
 
 ## Periodic Review
 

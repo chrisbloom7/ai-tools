@@ -31,8 +31,8 @@ Development workflow tools for worktree-based feature development.
 
 | Skill | Description |
 |-------|-------------|
-| `chrisbloom7-development:worktree-start` | Start development on a single task: plan, create worktree, write context, bootstrap session |
-| `chrisbloom7-development:parallel-workstreams` | Plan and orchestrate multiple parallel worktree sessions |
+| `chrisbloom7-development:worktree-start` | On explicit request: plan a single task, create a worktree, write context, bootstrap a session |
+| `chrisbloom7-development:parallel-workstreams` | On explicit request: plan and orchestrate multiple parallel worktree sessions |
 | `chrisbloom7-development:release` | Cut a release: validate, rotate the CHANGELOG, open the release PR, then tag after the owner merges. Project specifics come from a per-project overlay |
 
 > Requires [worktrunk CLI](https://worktrunk.dev).
