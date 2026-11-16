@@ -1,7 +1,7 @@
 ---
 name: release
-description: Cut a versioned release of a project - validate preconditions and the version, rotate the CHANGELOG, open a release PR, then (after the owner merges) tag and run post-release steps such as a Homebrew tap bump. Use when the user asks to "cut a release", "release vX.Y.Z", "bump the version", "tag a release", "publish a new version" or "handle the tag". Reads project-specific "release parameters" from a thin per-project overlay (see the Overlay contract). Requires worktrunk CLI and git; gh is recommended.
-compatibility: Requires worktrunk CLI (https://worktrunk.dev) and git; gh is recommended for opening PRs
+description: Cut a versioned release of a project - validate preconditions and the version, rotate the CHANGELOG, open a release PR, then (after the owner merges) tag and run post-release steps such as a Homebrew tap bump. Use when the user asks to "cut a release", "release vX.Y.Z", "bump the version", "tag a release", "publish a new version" or "handle the tag". Reads project-specific "release parameters" from a thin per-project overlay (see the Overlay contract). Requires worktrunk CLI and git; a GitHub client (gh or the GitHub MCP) is recommended.
+compatibility: Requires worktrunk CLI (https://worktrunk.dev) and git; a GitHub client (gh or the GitHub MCP) is recommended for opening PRs
 ---
 
 # Release
@@ -80,7 +80,7 @@ git push -u origin <branch_name>          # never the base branch
 gh pr create --base <base_branch> --title "<pr_title>" --body "<body>"
 ```
 
-If `gh` is not installed, push the branch and give the owner the GitHub compare URL (`https://github.com/<owner>/<repo>/compare/<base_branch>...<branch_name>`) with the title and body to paste.
+Use `gh` if it is installed. Otherwise use the GitHub MCP's pull-request creation tool if one is available, with the same base, title and body. If neither is available, push the branch and give the owner the GitHub compare URL (`https://github.com/<owner>/<repo>/compare/<base_branch>...<branch_name>`) with the title and body to paste.
 
 Flow `promote`: push nothing; open the PR with head `head_branch` and base `base_branch`.
 
