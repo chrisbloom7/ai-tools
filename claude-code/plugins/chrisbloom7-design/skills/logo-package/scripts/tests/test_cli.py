@@ -260,7 +260,7 @@ def test_build_with_a_missing_table_exits_1_with_its_name_and_keeps_outputs(
     assert cli.main(["build", str(tmp_path)]) == 1
     err = capsys.readouterr().err
     assert missing in err and "Traceback" not in err
-    assert (tmp_path / "svg" / "old.svg").exists()  # failed before deleting anything
+    assert (tmp_path / "svg" / "old.svg").exists()  # failed before any work
 
 
 def _brand_with_source(root, source_name="logo.png"):
@@ -271,7 +271,7 @@ def _brand_with_source(root, source_name="logo.png"):
     return root / "brand.toml"
 
 
-def test_build_run_checks_tools_before_deleting_anything(tmp_path, monkeypatch):
+def test_build_run_checks_tools_before_any_work(tmp_path, monkeypatch):
     monkeypatch.setattr(deps, "check_tools", lambda: ["potrace"])
     cfg = _brand_with_source(tmp_path)
     Image.new("RGBA", (10, 10)).save(tmp_path / "source" / "logo.png")

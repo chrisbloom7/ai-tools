@@ -92,9 +92,18 @@ suggest using them directly. A PDF that only wraps a bitmap is flagged, not trac
      otherwise.
 6. **Build:** `logo build <brand_dir>`. It assesses, builds every output, verifies each lockup
    against its source and writes the documents. It exits nonzero when a lockup misses the bar.
-   A build that fails after it starts leaves no outputs (the previous `svg/`, `png/` and
-   `logo-package/` are already deleted, and the documents are stale): fix the config and
-   rebuild.
+   The build changes no output until all of it has succeeded, so a failed build leaves the
+   previous outputs and documents exactly as they were (it only clears its own leftover
+   `.build-staging-<pid>/` and `.build-discard-<pid>/` folders): fix the config and rebuild.
+   If a build is killed while swapping, or cannot undo a failed swap, it leaves
+   `.build-previous-<pid>/` holding the earlier outputs, and every later build refuses to
+   start, listing the held files, until that folder is gone. To recover:
+   - Move each held file to the same path in the brand folder, replacing what is there, then
+     delete the held folder. `report/conversion-report.md` goes into the existing `report/`
+     folder; never replace the whole `report/` folder (it holds your own files).
+   - Or, if you no longer need the earlier outputs, delete the held folder.
+   - A brand folder whose `report` is a file, not a folder, is refused before any work: move
+     that file away first.
 7. **Review before claiming anything:** read `report/conversion-report.md` (tier, verify
    numbers, dropped pieces, what was traced flat or with gradients). Then open and look at the
    key files next to the sources: `png/logo-stacked-<variant>-1200.png`,
@@ -121,8 +130,17 @@ suggest using them directly. A PDF that only wraps a bitmap is flagged, not trac
     └── svg/  pdf/  png/       # the PDFs exist only here, in logo-package/pdf/
 ```
 
-A build deletes and regenerates `svg/`, `png/` and `logo-package/`, and overwrites the three
-documents. The generated `README.md` gives the owner the full rebuild command.
+A successful build replaces `svg/`, `png/`, `logo-package/`, `README.md` and
+`report/conversion-report.md`, each as a whole; a failed one leaves them as they were (see step
+6). Everything else in the brand folder (`source/`, `brand.toml`, your own files, including any
+other file in `report/`) is never touched. The build stages its work in a hidden
+`.build-staging-<pid>/` folder inside the brand folder and removes it when done. The managed
+folders are `svg/`, `png/` and `logo-package/`: a symlink to one is replaced by a real folder
+(the link's target is untouched), and one that is a mount point cannot be built into.
+`report/` itself is not swapped, only the file `report/conversion-report.md`: a symlinked
+`report/` folder gets the new report written into its target, and a symlinked report file is
+replaced as a link (its target is untouched). The generated `README.md` gives the owner the
+full rebuild command.
 
 ## Rules
 

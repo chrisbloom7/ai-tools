@@ -1,8 +1,13 @@
-"""Build every output from the source art: svg/, png/ and the logo-package/ handoff folder.
+"""Build every output from the source art: svg/, png/, the logo-package/ handoff folder and
+the three documents (README.md, logo-package/README.txt, report/conversion-report.md).
 
   from logo_pipeline import build
   result = build.run(Path("."))                     # config: tools/brand.toml (config.BRAND)
   result = build.run(brand_dir, config=Path("..."))  # another logo
+
+The build is all or nothing: everything is built into a staging folder inside the brand folder
+and swapped into place only when the build, the lockup verification and the documents all
+succeed. A failed build leaves the previous outputs exactly as they were.
 
 What is built comes from brand.toml (see `config.load_brand`): one set of outputs per
 `[variants.<name>]` table, named after the variant; the mark is `[brand] mark_element`, written
@@ -24,6 +29,7 @@ Owner decisions applied here (the spec left them open):
 - Never one-color, CMYK, EPS or AI files.
 """
 
+import os
 import re
 import shutil
 import tomllib
@@ -33,7 +39,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from . import compose, deps, minify, render, segment, verify
+from . import assess, compose, deps, minify, render, segment, verify
 from . import config as config_mod
 
 Result = verify.Result
@@ -51,6 +57,17 @@ SAFE_R = 0.39
 SHARE_H = 540
 WHITE = "#ffffff"
 OUT_DIRS = ("svg", "png", "logo-package")
+# Everything a build writes into the brand folder, each replaced as a whole on success. Of
+# report/ only the report itself is managed: other files there stay. Nothing else in the brand
+# folder (source/, brand.toml, tools/, the user's own files) is touched.
+MANAGED = (*OUT_DIRS, "README.md", "report/conversion-report.md")
+STAGING = ".build-staging-"  # + pid: the new outputs, built here
+PREVIOUS = ".build-previous-"  # + pid: the old outputs, moved here during the swap
+DISCARD = ".build-discard-"  # + pid: the old outputs after a successful swap, being deleted
+# Our own folders, by exact name (a user's ".build-previous-1.bak" never matches). Staging and
+# discard folders never hold the only copy of anything, so a later build removes them.
+DISPOSABLE = re.compile(r"\.build-(staging|discard)-\d+")
+INTERRUPTED = re.compile(r"\.build-previous-\d+")
 
 
 @dataclass
@@ -178,31 +195,200 @@ def _union(elements: dict[str, segment.Element]) -> tuple[np.ndarray, tuple[int,
     return mask, (int(b[:, 0].min()), int(b[:, 1].min()), int(b[:, 2].max()), int(b[:, 3].max()))
 
 
-def run(brand_dir: Path, config: Path | None = None, layout: str | None = None) -> BuildResult:
-    """Build every output under `brand_dir` from the brand.toml at `config` (default:
-    `config.BRAND`, the one next to the package). Sources resolve against `brand_dir`.
-    `layout` (config.LAYOUT_TOOLS or LAYOUT_SKILL; default: from where `config` sits, see
-    `config.layout_of`) is recorded on the result for the documents. Raises RuntimeError,
-    before deleting anything, when Chrome or potrace is missing (deps.check_tools)."""
+HELD_SHOWN = 20  # held files listed by name in a recovery message
+
+
+def _held_files(held: Path) -> str:
+    """The files in a held `.build-previous-<pid>` folder, by path relative to it."""
+    files = sorted(p.relative_to(held).as_posix() for p in held.rglob("*")
+                   if p.is_symlink() or not p.is_dir())
+    shown = ", ".join(files[:HELD_SHOWN]) or "nothing"
+    more = len(files) - HELD_SHOWN
+    return shown + (f" and {more} more" if more > 0 else "")
+
+
+def _move_back(held: Path) -> str:
+    """How to put the held files back by hand. report/ is not swapped as a folder (it holds the
+    user's own files), so a whole-folder move or replace would fail or lose them."""
+    return ("Move each file to the same path in the brand folder, replacing what is there. "
+            "`report/conversion-report.md` goes into the existing `report/` folder; never "
+            "replace the whole `report/` folder (it holds your own files). Then delete "
+            f"{held}.")
+
+
+def _check_interrupted(brand_dir: Path) -> None:
+    """Refuse to build while a `.build-previous-<pid>` folder exists. A swap that was killed
+    (SIGKILL, a second Ctrl-C) or could not roll back leaves the only copy of the earlier
+    outputs there, so a build must never remove it."""
+    left = sorted(p for p in brand_dir.iterdir() if INTERRUPTED.fullmatch(p.name))
+    if left:
+        held = left[0]
+        others = f" (and {', '.join(str(p) for p in left[1:])})" if left[1:] else ""
+        raise RuntimeError(
+            f"A previous build was interrupted and left {held}{others} holding your earlier "
+            f"outputs: {_held_files(held)}. To get the earlier outputs back: "
+            f"{_move_back(held)} If you no longer need them, just delete it. Then build "
+            "again.")
+
+
+def _check_report_folder(brand_dir: Path) -> None:
+    """The build writes report/conversion-report.md, so report must be a folder (or absent)."""
+    rp = brand_dir / "report"
+    if _exists(rp) and not rp.is_dir():
+        raise RuntimeError(
+            f"{rp} is not a folder, but the build writes report/conversion-report.md into a "
+            "report/ folder. Move it out of the brand folder (or rename it), then build again.")
+
+
+def _remove_stale(brand_dir: Path) -> None:
+    """Remove staging and discard folders left by a build that crashed or was killed. They are
+    ours (DISPOSABLE: matched by exact name), never the user's, and never the only copy of
+    anything. Two builds of one brand folder at the same time are not supported."""
+    for p in brand_dir.iterdir():
+        if DISPOSABLE.fullmatch(p.name):
+            if p.is_dir() and not p.is_symlink():
+                shutil.rmtree(p, ignore_errors=True)
+            else:
+                p.unlink(missing_ok=True)
+
+
+def _exists(p: Path) -> bool:
+    return p.exists() or p.is_symlink()
+
+
+def _remove(p: Path) -> None:
+    if p.is_dir() and not p.is_symlink():
+        shutil.rmtree(p)
+    else:
+        p.unlink()
+
+
+def _prune(root: Path, keep_root: bool = False) -> None:
+    """Remove the empty folders under `root`, deepest first, then `root` (unless `keep_root`)."""
+    for d in sorted((p for p in root.rglob("*") if p.is_dir() and not p.is_symlink()),
+                    key=lambda p: len(p.parts), reverse=True):
+        try:
+            d.rmdir()
+        except OSError:
+            pass
+    if not keep_root:
+        root.rmdir()
+
+
+def _swap(brand_dir: Path, staging: Path, previous: Path, discard: Path) -> None:
+    """Move the old MANAGED items into `previous`, then the staged ones into `brand_dir`, then
+    rename `previous` to `discard` (which any later build may delete). All renames stay on one
+    filesystem (both folders are inside `brand_dir`), so each is atomic. The last rename is
+    inside the same try, so the only window in which `previous` outlives a complete swap is
+    between two renames.
+
+    If anything fails or is interrupted, the rollback works from what is actually on disk (not
+    from a record of finished renames, which an interrupt can leave one step behind): a new
+    item in place is removed, each old item in `previous` is moved back, folders the swap
+    made are removed, and the error is raised again. If the rollback itself fails, `previous`
+    is kept, and the next build refuses to start until it is dealt with."""
+    existed = {n for n in MANAGED if _exists(brand_dir / n)}  # before any rename
+    made = [d for d in {(brand_dir / n).parent for n in MANAGED} if not _exists(d)]
+    previous.mkdir()
+    try:
+        for name in MANAGED:
+            if name in existed:
+                (previous / name).parent.mkdir(parents=True, exist_ok=True)
+                os.rename(brand_dir / name, previous / name)
+        for name in MANAGED:
+            if _exists(staging / name):
+                (brand_dir / name).parent.mkdir(parents=True, exist_ok=True)
+                os.rename(staging / name, brand_dir / name)
+        os.rename(previous, discard)  # done: the old outputs are now disposable
+    except BaseException as exc:
+        if not _exists(previous) and _exists(discard):
+            raise  # interrupted after the last rename: the swap is complete, keep the new build
+        stuck = []
+        for name in MANAGED:
+            here, old = brand_dir / name, previous / name
+            try:
+                if name not in existed:  # whatever is here now is new
+                    if _exists(here):
+                        _remove(here)
+                elif _exists(old):  # moved aside: anything here now is new
+                    if _exists(here):
+                        _remove(here)
+                    os.rename(old, here)
+                # else: the old item was never moved and is still in place
+            except OSError:
+                stuck.append(name)
+        for d in made:
+            try:
+                d.rmdir()  # only if still empty
+            except OSError:
+                pass
+        if stuck:  # keep `previous`: it holds the only copy of what could not be restored
+            _prune(previous, keep_root=True)  # drop empty folders (report/) left by the rollback
+            raise RuntimeError(
+                f"the build failed while swapping in the new outputs ({exc!r}) and could not "
+                f"restore {', '.join(stuck)}. {previous} keeps your earlier outputs: "
+                f"{_held_files(previous)}. {_move_back(previous)} A rebuild will refuse to "
+                "start until that folder is gone.") from exc
+        _prune(previous)
+        raise
+
+
+def run(brand_dir: Path, config: Path | None = None, layout: str | None = None,
+        assessment: assess.Assessment | None = None) -> BuildResult:
+    """Build every output and the three documents under `brand_dir` from the brand.toml at
+    `config` (default: `config.BRAND`, the one next to the package). Sources resolve against
+    `brand_dir`. `layout` (config.LAYOUT_TOOLS or LAYOUT_SKILL; default: from where `config`
+    sits, see `config.layout_of`) is recorded on the result for the documents. `assessment`
+    (`assess.assess` of the sources) goes into the documents; default: assessed here.
+
+    Raises RuntimeError, before any work, when Chrome or potrace is missing (deps.check_tools)
+    or when an interrupted build left a `.build-previous-<pid>` folder (`_check_interrupted`).
+    Everything is built into a staging folder inside `brand_dir` and swapped into place (see
+    MANAGED) only when the build, the verification and the documents all succeed; on any
+    failure the previous outputs are left untouched and the error is raised."""
     missing = [t for t in deps.check_tools() if t in ("chrome", "potrace")]
-    if missing:  # before anything is deleted
+    if missing:  # before any work
         hints = "; ".join(f"{t}: {deps.INSTALL_HINTS[t]}" for t in missing)
         raise RuntimeError(f"cannot build: missing {', '.join(missing)} ({hints})")
     brand_dir = Path(brand_dir)
     cfg_path = Path(config or config_mod.BRAND)
     brand = config_mod.load_brand(brand_dir, cfg_path)
     data = tomllib.loads(cfg_path.read_text())
-    config_mod.check_tables(data)  # before any output is deleted
-    rules = data["elements"]
+    config_mod.check_tables(data)  # before any work
     settings = compose.load_settings(cfg_path)
-    for d in OUT_DIRS:
-        shutil.rmtree(brand_dir / d, ignore_errors=True)
-    svg_dir, png_dir = brand_dir / "svg", brand_dir / "png"
-    pkg = brand_dir / "logo-package"
+    layout = layout or config_mod.layout_of(brand_dir, cfg_path)
+    _check_interrupted(brand_dir)
+    _check_report_folder(brand_dir)
+    _remove_stale(brand_dir)
+    staging = brand_dir / f"{STAGING}{os.getpid()}"
+    previous = brand_dir / f"{PREVIOUS}{os.getpid()}"
+    discard = brand_dir / f"{DISCARD}{os.getpid()}"
+    staging.mkdir()
+    try:
+        res = _build(staging, brand, data["elements"], cfg_path, settings, layout)
+        if assessment is None:
+            assessment = assess.assess([v.source for v in brand.variants.values()])
+        # imported here: report imports this module at load time
+        from . import report
+        # the documents describe brand_dir (paths, rebuild command) but are written to staging
+        report.write_all(brand_dir, assessment, res, layout=layout, out=staging)
+        _swap(brand_dir, staging, previous, discard)
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+        # the old outputs after a complete swap; whatever a kill leaves, the next build removes
+        shutil.rmtree(discard, ignore_errors=True)
+    res.files = [brand_dir / p.relative_to(staging) for p in res.files]
+    return res
+
+
+def _build(out: Path, brand: config_mod.Brand, rules: dict, cfg_path: Path,
+           settings: compose.Settings, layout: str) -> BuildResult:
+    """Build every output into `out` (an empty folder); raise when a lockup fails verify."""
+    svg_dir, png_dir = out / "svg", out / "png"
+    pkg = out / "logo-package"
     for d in (svg_dir, png_dir, pkg / "svg", pkg / "pdf", pkg / "png"):
         d.mkdir(parents=True)
-    res = BuildResult(brand=brand, config=cfg_path, settings=settings,
-                      layout=layout or config_mod.layout_of(brand_dir, cfg_path))
+    res = BuildResult(brand=brand, config=cfg_path, settings=settings, layout=layout)
     if brand.mark_element is None:
         res.notes.append(NO_MARK_NOTE)
 

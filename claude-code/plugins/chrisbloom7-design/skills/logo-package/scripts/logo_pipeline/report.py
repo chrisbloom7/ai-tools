@@ -2,6 +2,7 @@
 report/conversion-report.md.
 
   report.write_all(brand_dir, assessment, results)
+  report.write_all(brand_dir, assessment, results, out=staging)  # what build.run does
 
 `results` is the `build.BuildResult`. It carries the brand (`config.load_brand`: name, variants,
 mark, tiles, share-card variant, `[report] notes`), the brand.toml path and `[compose]`
@@ -105,8 +106,10 @@ def _read_rgba(path: Path) -> np.ndarray | None:
 class _Doc:
     """Everything the three documents need, read once from the build result and brand.toml."""
 
-    def __init__(self, brand_dir: Path, assessment, results, layout: str | None = None):
-        self.dir = Path(brand_dir)
+    def __init__(self, brand_dir: Path, assessment, results, layout: str | None = None,
+                 out: Path | None = None):
+        self.dir = Path(brand_dir)  # the brand folder the documents describe
+        self.out = Path(out or brand_dir)  # where the built files are and the documents go
         self.a, self.r = assessment, results
         self.cfg_path = Path(results.config or config_mod.BRAND)
         self.layout = (layout or getattr(results, "layout", None)
@@ -210,7 +213,7 @@ def _halo_bands(d: _Doc) -> dict[str, tuple[float, float, str]]:
     """{variant: (width in source px, opacity, color)} of the halo band, from the built lockups."""
     out = {}
     for v in d.names:
-        f = d.dir / "svg" / f"logo-stacked-{v}.svg"
+        f = d.out / "svg" / f"logo-stacked-{v}.svg"
         m = f.exists() and re.search(r'<g [^>]*class="n-halos"[^>]*>', f.read_text())
         if m:
             px = re.search(r'data-halo-px="([0-9.]+)"', m.group(0))
@@ -607,15 +610,19 @@ def _package_txt(d: _Doc) -> str:
     return "\n".join(p) + "\n"
 
 
-def write_all(brand_dir: Path, assessment, results, layout: str | None = None) -> None:
-    """Write README.md, logo-package/README.txt and report/conversion-report.md under
-    `brand_dir` (overwriting them) from the assessment and the `build.BuildResult`.
+def write_all(brand_dir: Path, assessment, results, layout: str | None = None,
+              out: Path | None = None) -> None:
+    """Write README.md, logo-package/README.txt and report/conversion-report.md under `out`
+    (default: `brand_dir`; overwriting them) from the assessment and the `build.BuildResult`.
 
-    `layout` (config.LAYOUT_TOOLS or LAYOUT_SKILL) decides how the documents name the config
-    and the rebuild command; default: the result's `layout`, else from where its config sits."""
-    d = _Doc(brand_dir, assessment, results, layout)
-    (d.dir / "report").mkdir(exist_ok=True)
-    (d.dir / "logo-package").mkdir(exist_ok=True)
-    (d.dir / "README.md").write_text(_readme(d))
-    (d.dir / "logo-package" / "README.txt").write_text(_package_txt(d))
-    (d.dir / "report" / "conversion-report.md").write_text(_report(d))
+    The documents describe `brand_dir` (source paths, the rebuild command) and read the built
+    SVGs from `out`: `build.run` passes its staging folder as `out`, so they name the final
+    brand folder, never the staging one. `layout` (config.LAYOUT_TOOLS or LAYOUT_SKILL) decides
+    how the documents name the config and the rebuild command; default: the result's `layout`,
+    else from where its config sits."""
+    d = _Doc(brand_dir, assessment, results, layout, out)
+    (d.out / "report").mkdir(exist_ok=True)
+    (d.out / "logo-package").mkdir(exist_ok=True)
+    (d.out / "README.md").write_text(_readme(d))
+    (d.out / "logo-package" / "README.txt").write_text(_package_txt(d))
+    (d.out / "report" / "conversion-report.md").write_text(_report(d))

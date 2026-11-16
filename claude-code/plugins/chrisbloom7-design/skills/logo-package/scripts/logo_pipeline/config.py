@@ -137,7 +137,7 @@ REQUIRED = (("elements", None), ("elements", "palette"), ("elements", "regions")
 
 def check_tables(data: dict) -> None:
     """Raise ValueError naming the first table or key of REQUIRED that `data` (a parsed
-    brand.toml) lacks, so a build fails before it deletes any output."""
+    brand.toml) lacks, so a build fails before it does any work."""
     for table, key in REQUIRED:
         t = data.get(table)
         if not isinstance(t, dict):

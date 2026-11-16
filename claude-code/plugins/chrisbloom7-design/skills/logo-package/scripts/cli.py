@@ -35,6 +35,9 @@ OPAQUE = 128
 COLOR_STEP = 16  # colors quantize to a grid of this many levels per channel
 COLOR_MERGE = 24.0  # RGB distance under which two grid colors count as one color
 COLOR_MIN_SHARE = 0.002  # colors under this share of the opaque pixels are not listed
+UNTOUCHED = "The previous outputs were left untouched."  # a failed build changes nothing
+RAISE_TRACE = ("Raise the trace scale ([compose] LOCKUP_TRACE up) or fix the [elements] regions "
+               "and palette, then build again.")
 
 
 def _fail(msg: str) -> int:
@@ -252,26 +255,26 @@ def cmd_build(args) -> int:
         brand = config.load_brand(brand_dir, cfg)
         assessment = assess.assess([v.source for v in brand.variants.values()])
         layout = config.layout_of(brand_dir, cfg)  # what the documents say about it
-        result = pipeline_build.run(brand_dir, config=cfg, layout=layout)
+        # builds the outputs and writes the documents; changes nothing unless all of it succeeds
+        result = pipeline_build.run(brand_dir, config=cfg, layout=layout, assessment=assessment)
     except RuntimeError as e:
         if "failed verification" in str(e):
             return _fail(f"{e}. The lockup misses the [verify] bar in {cfg}. The previous "
-                         "svg/, png/ and logo-package/ were already deleted and the documents are "
-                         "stale. Raise the trace scale ([compose] LOCKUP_TRACE up) or fix the "
-                         "[elements] regions and palette, then build again.")
+                         f"outputs were left untouched. {RAISE_TRACE}")
         return _fail(str(e))
     except (ValueError, tomllib.TOMLDecodeError) as e:
         return _fail(f"{e} (config: {cfg})")
     except UnidentifiedImageError as e:
-        return _fail(f"a variant's source is not a raster image (use a PNG): {e}")
+        return _fail(f"a variant's source is not a raster image (use a PNG): {e}. {UNTOUCHED}")
+    except OSError as e:  # after UnidentifiedImageError, which is an OSError too
+        return _fail(f"the build failed: {e}. {UNTOUCHED}")
     except subprocess.TimeoutExpired as e:
         cmd = e.cmd[0] if isinstance(e.cmd, (list, tuple)) and e.cmd else e.cmd
         return _fail(f"{Path(str(cmd)).name or 'a tool'} timed out after {e.timeout} s; try "
-                     "again, or check that Chrome and potrace run")
+                     f"again, or check that Chrome and potrace run. {UNTOUCHED}")
     except (KeyError, TypeError, AttributeError) as e:  # a table or key of the wrong shape
         return _fail(f"brand.toml has a missing or malformed table or key ({e!r}); compare it "
                      f"with brand.example.toml (config: {cfg})")
-    report.write_all(brand_dir, assessment, result, layout=layout)
 
     print(f"config {cfg}")
     print(f"input graded {assessment.tier}")
