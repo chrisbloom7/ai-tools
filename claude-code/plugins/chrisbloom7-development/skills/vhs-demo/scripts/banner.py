@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Print a title card: big block letters with a color gradient, then a tagline. Centered in the terminal. Usage: banner.py NAME [TAGLINE]
-Pure standard library, so a demo needs no figlet. Prints one row at a time so it can be revealed on screen."""
+Pure standard library, so a demo needs no figlet. Prints one row at a time so it can be revealed on screen,
+then hides the cursor; restore it with `tput cnorm`."""
 import shutil, sys, time
 F = {
  'A':["  █  "," █ █ ","█████","█   █","█   █"], 'B':["████ ","█   █","████ ","█   █","████ "],
@@ -32,3 +33,4 @@ for r in rows:
     time.sleep(0.12)
 if tag:
     print("\n" + " " * max(0, (cols - len(tag)) // 2) + f"\033[2m{tag}\033[0m", flush=True)
+print("\033[?25l", end="", flush=True)  # hide the cursor while the card shows; the tape restores it with `tput cnorm`

@@ -67,7 +67,7 @@ Show
 Sleep 2500ms
 
 Hide
-Type "PS1='$ ' && clear"
+Type "tput cnorm && PS1='$ ' && clear"
 Enter
 Show
 
@@ -96,7 +96,7 @@ Sleep 2500ms
 
 For in-file comments, drop the `Type@25ms "# ..."` lines and put a `#` comment above each group instead. `Type` accepts backticks around text that contains double quotes; `\"` is not valid.
 
-**Title card.** Copy `scripts/banner.py` from this skill's directory to the demo directory (`command cp -f`, since `cp` may be an interactive alias) and call it as `python3 banner.py "<name>" "<tagline>"`. It prints the name in 5-row block letters with a magenta-to-cyan gradient, centered in the terminal, one row at a time, then the tagline. It needs only Python 3. Use a name that fits: the art is 7 columns per letter and the terminal has about width ÷ 10 columns at font size 15-16, so 14 letters need about 100 columns (use the short name, for example `brewfile` for `brewfile-tools`, whose 105 columns would not fit at width 1000). Set `PS1=` before drawing so no prompt shows under it. The script supports A-Z, space and a hyphen.
+**Title card.** Copy `scripts/banner.py` from this skill's directory to the demo directory (`command cp -f`, since `cp` may be an interactive alias) and call it as `python3 banner.py "<name>" "<tagline>"`. It prints the name in 5-row block letters with a magenta-to-cyan gradient, centered in the terminal, one row at a time, then the tagline. It needs only Python 3. Use a name that fits: the art is 7 columns per letter and the terminal has about width ÷ 10 columns at font size 15-16, so 14 letters need about 100 columns (use the short name, for example `brewfile` for `brewfile-tools`, whose 105 columns would not fit at width 1000). Set `PS1=` before drawing so no prompt shows under it. The script hides the cursor when it finishes, so run `tput cnorm` (as in the example) before the next step to bring it back. The script supports A-Z, space and a hyphen.
 
 ## Steps
 
@@ -145,6 +145,7 @@ For in-file comments, drop the `Type@25ms "# ..."` lines and put a `#` comment a
 | No blank line between commands | Separate every command group with one empty line |
 | Output scrolls off or runs into the next prompt | `Ctrl+L` before each step; end `cat` with `; echo` |
 | GIF jumps when it repeats | Open and end on the same title card |
+| A stray cursor block under the title card, or no cursor after it | The script hides the cursor; `tput cnorm` after the card restores it |
 | Plain or off-center title card, or a prompt under it | Use `scripts/banner.py` (centered, gradient); set `PS1=` for the title card |
 | Title card name wraps | Use a shorter name; the art is 7 columns per letter |
 | GIF written to the wrong place | Run `vhs` from the repo root; `Output` is relative to the working directory |
