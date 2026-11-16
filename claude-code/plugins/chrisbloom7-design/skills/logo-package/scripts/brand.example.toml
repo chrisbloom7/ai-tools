@@ -1,0 +1,119 @@
+# brand.toml: how the logo-package build reads one logo. `cli.py init` copies this file into a
+# brand folder; edit it for the logo at hand. Paths are relative to the brand folder (the
+# folder that holds this file and source/). Unknown keys in [brand], [variants.*], [report]
+# and [compose] are errors, so a typo cannot silently fall back to a default.
+#
+# This example describes an invented logo, "Example Logo": a teal ring (the symbol) above an
+# orange bar (the wordmark), drawn on one transparent square canvas. Replace the names, the
+# source path, the colors and the region boxes with the real logo's.
+#
+# Helpers (run from the brand folder; see the skill's SKILL.md for the full command):
+#   cli.py assess source/*.png    grade the art and list what would improve it
+#   cli.py colors source/x.png    dominant colors, for the [elements.palette] anchors
+#   cli.py blobs source/x.png     numbered blobs with centers, for the [elements.regions] boxes
+
+[brand]
+# Required. The brand name the generated documents use (not used in file names).
+name = "Example Logo"
+# Optional. The region (from [elements.regions]) drawn alone as the mark, in
+# svg/mark-<mark_name>.svg, and on the icons and favicons. Set it when the logo has a symbol
+# that stands on its own (a star, an initial, a badge). Leave it out when there is none: then no
+# marks are built and the icons and favicons use the whole stacked lockup.
+# mark_element = "symbol"
+# Optional. Whose lockup goes on the share card (default: the first variant below).
+share_card_variant = "default"
+
+# One [variants.<name>] table per version of the logo (for example a light and a dark version),
+# in processing order. Output names use the table name: svg/logo-stacked-<name>.svg,
+# svg/icon-<name>.svg, png/icon-<name>-512.png and so on. Variants should share one canvas size
+# and placement.
+[variants.default]
+# Required. The source PNG, relative to the brand folder. The art is never altered.
+source = "source/logo.png"
+# Required. Icon and favicon tile color (#rrggbb). Pick a color from the art or a neutral that
+# the logo's outline still reads on; the report prints the outline-on-tile contrast ratio.
+tile = "#fdf6e3"
+# Required only when [brand] mark_element is set: the file stem of this variant's mark
+# (svg/mark-<mark_name>.svg). Must differ between variants.
+# mark_name = "ring"
+# Optional. A word such as "light" or "dark": the docs then say "use the <variant> files on
+# <background> backgrounds".
+# background = "light"
+
+# Optional. Facts about the art that the code cannot measure (texture, a lost highlight),
+# supplied by whoever looked at the outputs. Each sentence is listed under "Known limits of this
+# conversion" in report/conversion-report.md, and nowhere else.
+# [report]
+# notes = [
+#   "The paper grain is not reproduced.",
+# ]
+
+[elements]
+# How the flat PNG is split into named elements. Opaque pixels (alpha >= alpha_solid) form
+# connected blobs; blobs smaller than area_floor are stray specks and are dropped; soft pixels
+# (anti-aliased edges, glows) at or above alpha_min join the nearest kept blob within reach.
+# The defaults below suit most art; change them only when `cli.py blobs` or the report shows a
+# problem (a real piece dropped as a speck, or a speck kept as a piece).
+alpha_solid = 128       # alpha (0-255) at or above which a pixel is opaque and forms blobs
+alpha_min = 16          # soft pixels at or above this alpha can join an element
+# The four size knobs are fractions of the canvas, so they scale with the image. area_floor and
+# island_floor are fractions of the canvas AREA; reach and smooth are fractions of the SHORTER
+# side. The values below come to 2000 px, 32 px, 7 px and 64 px on a 2400 x 2400 canvas.
+area_floor = 3.47222e-4 # opaque blobs smaller than this are specks; keep it under the smallest
+#                         real piece (`cli.py blobs` lists the areas)
+reach = 0.0133333       # soft pixels farther than this from a kept blob are dropped
+smooth = 0.0029167      # mode-filter window that cleans flecks out of the color layers
+island_floor = 1.11111e-5 # a color island smaller than this takes its surrounding color
+# The palette entry (from [elements.palette]) that is each element's outline layer. The icons'
+# contrast check and the simplified 16 px favicon use it. Name any entry when the art has no
+# outline; it then is just the element's main color.
+outline = "teal"
+
+# Palette: each entry is one or more anchor colors (#rrggbb). A pixel joins the entry whose
+# anchors pass closest to its color; two or more anchors form a ramp (for a gradient, list its
+# end colors). Anchors only steer the split: every fill is sampled from the art itself, so they
+# do not have to be exact. Take them from `cli.py colors`. Entry names become layer names.
+[elements.palette]
+teal = ["#1f8a9e"]
+orange = ["#f0781e"]
+# halo = ["#ffffff"]           # a soft white rim around the art, if it has one
+# gold = ["#f2c94c", "#f2994a"] # a two-anchor ramp for a yellow-to-orange gradient fill
+
+# Regions: one [elements.regions.<name>] table per element. A blob belongs to the element
+# whose `center` box holds the center of the blob's bounding box. The box is
+# [x0, y0, x1, y1] as fractions of the canvas (0 is the left or top edge, 1 the right or
+# bottom; upper bounds are exclusive). Every kept blob must match exactly one region (boxes
+# must not overlap), and every region must match at least one blob unless it sets
+# `optional = true`. Take the centers from `cli.py blobs`. `palette` (optional, default: every
+# entry) limits the colors this element's pixels may take.
+[elements.regions.symbol]
+center = [0.0, 0.0, 1.0, 0.6]
+palette = ["teal"]
+
+[elements.regions.wordmark]
+center = [0.0, 0.6, 1.0, 1.0]
+palette = ["orange"]
+
+# Verify bar: each stacked lockup is rendered in Chrome and compared with its source. The build
+# fails when a lockup misses either number.
+[verify]
+iou_min = 0.98          # overlap (IoU) of the opaque shapes, rendered vs. source; 1.0 is exact
+color_error_max = 8.0   # mean per-channel difference (0-255) over pixels opaque in both
+
+# Optional tuning of the drawing step. Every key is optional; the values shown are the in-code
+# defaults, so leaving the whole table commented out changes nothing. Uncomment a key only to
+# fix a problem the report or the outputs show.
+# [compose]
+# HALO_ALPHA = 48   # alpha (0-255) of the soft rim pixels a halo's width and opacity come from
+# HALO_GAP = 3      # px next to the body left out of the halo's color (they are edge blends)
+# ERODE = 4         # px trimmed off a flat layer before its mean color is taken
+# MARGIN = 0.04     # share of the art's longer side added on every side of a viewBox
+# STOPS = 5         # color stops sampled for each gradient layer
+# Trace settings for potrace. up = resample factor before tracing, sigma = pre-trace blur in
+# SOURCE px, alpha = potrace -a (corner threshold; higher is smoother), opt = potrace -O
+# (curve optimization). A table may name only some keys. Without up and sigma, they follow the
+# canvas (L = its larger side in px): the lockup is traced at 1200 px (up = 1200 / L,
+# sigma = 1.5 * L / 2400) and the mark at 2400 px (up = 2400 / L, sigma = 5.0 * L / 2400).
+# Raise `up` when the verify IoU falls short on small or detailed art.
+# LOCKUP_TRACE = { alpha = 1.1, opt = 1.0 }
+# MARK_TRACE = { alpha = 1.2, opt = 1.0 }
