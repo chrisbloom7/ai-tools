@@ -1,4 +1,5 @@
 import dataclasses
+import inspect
 import re
 import shutil
 import xml.etree.ElementTree as ET
@@ -7,7 +8,6 @@ import numpy as np
 import pytest
 
 from logo_pipeline import compose, gradients, minify, render, segment
-from logo_pipeline.variants import SharedReport
 
 pytestmark = pytest.mark.skipif(shutil.which("potrace") is None,
                                 reason="potrace is needed to trace")
@@ -88,7 +88,7 @@ def elements(art):
 
 @pytest.fixture(scope="module")
 def stacked_svg(art, elements):
-    return compose.stacked("primary", elements, SharedReport(), rgba=art)
+    return compose.stacked("primary", elements, rgba=art)
 
 
 def groups(svg, element):
@@ -151,7 +151,7 @@ def test_halo_opacity_is_one_value_on_one_group(art):
     c = art.copy()
     c[312:320, 32:268] = (255, 255, 255, 140)  # seal: a brighter rim along its top
     els = segment.split_elements(c, RULES)
-    svg = compose.stacked("primary", els, SharedReport(), rgba=c)
+    svg = compose.stacked("primary", els, rgba=c)
     root = ET.fromstring(svg)
     (wrap,) = [g for g in root.iter("{http://www.w3.org/2000/svg}g") if g.get("class") == "n-halos"]
     # the median of the art's rim alphas: most rims are 70, so the bright seal top does not move it
@@ -295,13 +295,24 @@ def test_stacked_draws_every_element_it_is_given_in_order(art, elements, missing
     # no fixed element list: whatever segmentation returned is the lockup (a required region
     # that is missing already raised in segment)
     els = {k: v for k, v in elements.items() if k != missing}
-    drawn = _drawn(compose.stacked("primary", els, SharedReport(), rgba=art))
+    drawn = _drawn(compose.stacked("primary", els, rgba=art))
     assert list(dict.fromkeys(drawn)) == list(els)
+
+
+def test_stacked_takes_no_shared_parameter(art, elements):
+    # sharing was never implemented in compose (each variant is traced on its own), so the
+    # signature is (variant, elements, *, rgba, ...) and a third positional argument is an error
+    params = inspect.signature(compose.stacked).parameters
+    assert "shared" not in params
+    assert [n for n, q in params.items() if q.kind is q.POSITIONAL_OR_KEYWORD] == [
+        "variant", "elements"]
+    with pytest.raises(TypeError):
+        compose.stacked("primary", elements, object(), rgba=art)
 
 
 def test_stacked_with_no_elements_raises(art):
     with pytest.raises(ValueError, match="no elements"):
-        compose.stacked("primary", {}, SharedReport(), rgba=art)
+        compose.stacked("primary", {}, rgba=art)
 
 
 def test_mark_draws_the_element_named_by_the_keyword(art, elements):

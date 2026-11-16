@@ -35,7 +35,6 @@ from PIL import Image
 
 from . import compose, deps, minify, render, segment, verify
 from . import config as config_mod
-from .variants import SharedReport
 
 Result = verify.Result
 
@@ -219,7 +218,7 @@ def run(brand_dir: Path, config: Path | None = None, layout: str | None = None) 
         els = segment.split_elements(rgba, rules)
         res.elements[v] = els
         res.dropped[v] = segment.dropped_components(rgba, rules)
-        raw = compose.stacked(v, els, SharedReport(), rgba=rgba, settings=settings)
+        raw = compose.stacked(v, els, rgba=rgba, settings=settings)
         stk = minify.minify(raw, STACKED_W, 0)
         stacked_min[v] = stk
 
