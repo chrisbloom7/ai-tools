@@ -266,6 +266,8 @@ def cmd_build(args) -> int:
         return _fail(f"{e} (config: {cfg})")
     except UnidentifiedImageError as e:
         return _fail(f"a variant's source is not a raster image (use a PNG): {e}. {UNTOUCHED}")
+    except OSError as e:  # after UnidentifiedImageError, which is an OSError too
+        return _fail(f"the build failed: {e}. {UNTOUCHED}")
     except subprocess.TimeoutExpired as e:
         cmd = e.cmd[0] if isinstance(e.cmd, (list, tuple)) and e.cmd else e.cmd
         return _fail(f"{Path(str(cmd)).name or 'a tool'} timed out after {e.timeout} s; try "
