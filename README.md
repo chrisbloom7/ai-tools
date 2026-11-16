@@ -6,9 +6,15 @@ A collection of AI assistant tools and skills, organized by ecosystem.
 
 ```
 ai-tools/
+├── .claude/              # Claude Code project settings and hook
+│   ├── settings.json
+│   └── hooks/validate-manifest.sh
+├── .claude-plugin/       # Marketplace manifest (marketplace.json)
+├── .github/              # CI workflow, validation script, CODEOWNERS, Dependabot
 ├── claude-code/          # Claude Code marketplace plugins
 │   └── plugins/
 │       └── chrisbloom7-development/
+│           ├── .claude-plugin/plugin.json
 │           └── skills/
 │               ├── worktree-start
 │               ├── parallel-workstreams
