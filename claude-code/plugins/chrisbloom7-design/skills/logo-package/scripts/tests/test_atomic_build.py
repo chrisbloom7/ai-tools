@@ -199,10 +199,11 @@ def test_a_build_refuses_to_start_while_an_interrupted_swap_holds_the_old_output
     assert "svg/only-copy.svg" in flat  # the held files, listed by path
     assert "Move each file to the same path in the brand folder, replacing what is there" in flat
     assert "never replace the whole `report/` folder (it holds your own files)" in flat
-    # how to tell a complete swap that was only cut short before its old copy was deleted
-    assert ("If the brand folder already has a complete new build (svg/, png/, logo-package/, "
-            "README.md and report/conversion-report.md all present, and their files newer than "
-            "the files in this folder), this folder is just the old copy: delete it.") in flat
+    assert "holding your earlier outputs" in flat
+    # no shortcut telling a person when the held folder is safe to delete as stale: after a
+    # failed rollback it can be the only copy of part of the old outputs
+    for phrase in ("already has a complete", "old copy", "files newer"):
+        assert phrase not in flat, phrase
     assert "move its contents back" not in flat.lower()
     assert "Traceback" not in err and "stop here" not in err
     assert _snapshot(tmp_path) == before  # nothing touched, not even the stale staging folder
@@ -319,7 +320,10 @@ def test_a_failed_rollback_of_the_report_lists_it_and_keeps_the_users_report_fil
     err = " ".join(capsys.readouterr().err.split())
     held = tmp_path / f".build-previous-{os.getpid()}"
     assert calls[11][0] == held / "report" / "conversion-report.md"
-    assert "report/conversion-report.md" in err and str(held) in err
+    assert str(held) in err
+    # the held-file list itself (the move-back instruction also names the report file)
+    listed = err.split("keeps your earlier outputs: ", 1)[1].split(". Move each file", 1)[0]
+    assert listed == "report/conversion-report.md", listed
     assert "`report/conversion-report.md` goes into the existing `report/` folder" in err
     assert "move its contents back" not in err.lower()
     assert (held / "report/conversion-report.md").read_bytes() == OLD["report/conversion-report.md"]
@@ -358,3 +362,24 @@ def test_a_failed_final_rename_rolls_back_instead_of_keeping_a_half_finished_swa
     assert "left untouched" in capsys.readouterr().err
     assert _snapshot(tmp_path) == before
     assert _leftovers(tmp_path) == []
+
+
+@pytest.mark.slow
+@NEEDS_BUILD
+def test_an_interrupt_right_after_the_swap_completes_keeps_the_new_build(tmp_path, monkeypatch):
+    cfg = _brand(tmp_path)
+    # rename 11 marks the old copy disposable (.build-previous-<pid> to .build-discard-<pid>):
+    # it completes, then the interrupt lands, before the swap returns
+    calls = _flaky_rename(monkeypatch, tmp_path, 11, after=True)
+    with pytest.raises(KeyboardInterrupt):
+        build.run(tmp_path, config=cfg)
+    assert calls[10][1].name.startswith(".build-discard-")
+    after = _snapshot(tmp_path)
+    for rel, data in OLD.items():  # the new build is in place
+        assert after.get(rel) != data, rel
+    assert "svg/logo-stacked-default.svg" in after and "logo-package/README.txt" in after
+    assert _leftovers(tmp_path) == []
+    monkeypatch.undo()
+    _stop(monkeypatch)  # the next build starts (no refusal) and stops at its first step
+    with pytest.raises(RuntimeError, match="stop here"):
+        build.run(tmp_path, config=cfg)

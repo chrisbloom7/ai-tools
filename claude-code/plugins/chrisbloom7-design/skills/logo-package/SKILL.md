@@ -98,12 +98,10 @@ suggest using them directly. A PDF that only wraps a bitmap is flagged, not trac
    If a build is killed while swapping, or cannot undo a failed swap, it leaves
    `.build-previous-<pid>/` holding the earlier outputs, and every later build refuses to
    start, listing the held files, until that folder is gone. To recover:
-   - If the brand folder already has a complete new build (`svg/`, `png/`, `logo-package/`,
-     `README.md` and `report/conversion-report.md` all present, and their files newer than the
-     held ones), the held folder is just the old copy: delete it.
-   - Otherwise move each held file to the same path in the brand folder, replacing what is
-     there, then delete the held folder. `report/conversion-report.md` goes into the existing
-     `report/` folder; never replace the whole `report/` folder (it holds your own files).
+   - Move each held file to the same path in the brand folder, replacing what is there, then
+     delete the held folder. `report/conversion-report.md` goes into the existing `report/`
+     folder; never replace the whole `report/` folder (it holds your own files).
+   - Or, if you no longer need the earlier outputs, delete the held folder.
    - A brand folder whose `report` is a file, not a folder, is refused before any work: move
      that file away first.
 7. **Review before claiming anything:** read `report/conversion-report.md` (tier, verify

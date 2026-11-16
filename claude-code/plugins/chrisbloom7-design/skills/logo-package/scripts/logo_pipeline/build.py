@@ -226,10 +226,7 @@ def _check_interrupted(brand_dir: Path) -> None:
         others = f" (and {', '.join(str(p) for p in left[1:])})" if left[1:] else ""
         raise RuntimeError(
             f"A previous build was interrupted and left {held}{others} holding your earlier "
-            f"outputs: {_held_files(held)}. If the brand folder already has a complete new "
-            "build (svg/, png/, logo-package/, README.md and report/conversion-report.md all "
-            "present, and their files newer than the files in this folder), this folder is "
-            "just the old copy: delete it. Otherwise, to get the earlier outputs back: "
+            f"outputs: {_held_files(held)}. To get the earlier outputs back: "
             f"{_move_back(held)} If you no longer need them, just delete it. Then build "
             "again.")
 
