@@ -39,7 +39,6 @@ from scipy import ndimage as ndi
 from . import gradients, minify, trace
 from .config import BRAND  # brand.toml next to the package, else brand.example.toml
 from .segment import Element
-from .variants import SharedReport
 
 HALO = "halo"
 HALO_ALPHA = 48  # halo rim threshold: the band's width and opacity are measured from pixels
@@ -142,17 +141,17 @@ def _resolve(settings: Settings | None, halo_alpha: int | None, trace_opts: dict
             st.trace_opts(kind, shape) if trace_opts is None else trace_opts)
 
 
-def stacked(variant: str, elements: dict[str, Element], shared: SharedReport | None = None,
-            *, rgba: np.ndarray, halo_alpha: int | None = None,
-            trace_opts: dict | None = None, settings: Settings | None = None) -> str:
+def stacked(variant: str, elements: dict[str, Element], *, rgba: np.ndarray,
+            halo_alpha: int | None = None, trace_opts: dict | None = None,
+            settings: Settings | None = None) -> str:
     """Full lockup SVG for one variant: every element in `elements`, drawn in their order.
 
     The lockup is whatever segmentation returned (a required region that is missing already
     raised in `segment.split_elements`); no elements at all is a ValueError. `rgba` is that
-    variant's source art (colors are measured from it). `shared` is accepted
-    for pieces that are identical across variants; it is unused, so every
-    element is traced from this variant's own masks. `settings` (default: brand.toml's
-    `[compose]` table) supplies the tunables; `halo_alpha` and `trace_opts` override it.
+    variant's source art (colors are measured from it). Every element is traced from this
+    variant's own masks (pieces are not reused across variants). `settings` (default:
+    brand.toml's `[compose]` table) supplies the tunables; `halo_alpha` and `trace_opts`
+    override it.
     """
     st, halo_alpha, trace_opts = _resolve(settings, halo_alpha, trace_opts, "lockup",
                                           rgba.shape)
