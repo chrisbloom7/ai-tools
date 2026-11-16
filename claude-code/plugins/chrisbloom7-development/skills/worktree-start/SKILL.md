@@ -1,6 +1,6 @@
 ---
 name: worktree-start
-description: Start development on a new task using an isolated worktree. Use this skill when the user explicitly requests a worktree ("spin up a worktree", "start a worktree for..."), or when they ask to start work on a task AND the repo shows worktree signals (worktrunk config present, .worktrees/ directory exists, or CLAUDE.md mentions worktrees). Do NOT trigger automatically just because the user wants to start development — check first. Requires worktrunk CLI.
+description: Start development on a new task in an isolated worktree. Use ONLY when the user explicitly asks for a worktree (for example "spin up a worktree" or "start a worktree for ...") or invokes this skill by name. Do not use it because a task is starting or because the repo has worktree config. Requires worktrunk CLI.
 compatibility: Requires worktrunk CLI (https://worktrunk.dev) and git
 ---
 
@@ -17,31 +17,30 @@ This skill builds on top of worktrunk (`wt` CLI) for worktree management. It add
 - **git** repository with a clean working tree on the main branch (or a primary worktree)
 - A task to work on (issue tracker ID, URL, description, or verbal explanation)
 
+## The user's own worktree rules come first
+
+If the user has their own worktree or worktrunk rules (for example in `~/.claude/rules/`, the project's
+`CLAUDE.md` or a project rule), follow them wherever they differ from this skill. The defaults below
+apply when no such rules are loaded:
+
+- Manage worktrees with `wt`, never raw `git worktree`. Create with `wt switch --create <branch> --yes`.
+- Verify any post-create hooks ran. If one failed, stop and report.
+- Never run `wt merge`. Open a PR for the owner to merge.
+- Update a stale base with `git pull --ff-only`, and only after asking.
+- Follow the repo's existing branch naming. Branch from the base the project names (not always the
+  default branch).
+- Remove a worktree with `wt remove`. If its branch is not merged, ask whether to keep or discard the
+  branch first.
+
 ## Workflow
 
 Work through these steps in order. Do not skip steps.
 
-### Step 0 — Decide Whether a Worktree Is Appropriate
+### Step 0 — Confirm the Request
 
-Before proceeding, confirm a worktree is the right approach. Check in order:
-
-1. **Explicit request** — did the user say "worktree", "spin up", "isolated session", or similar? If yes, proceed.
-
-2. **Repo signals** — does the repo show worktree usage?
-   - `~/.config/worktrunk/config.toml` exists (worktrunk is configured)
-   - `.worktrees/` directory exists at the repo root
-   - `CLAUDE.md` mentions worktrees or worktrunk
-
-   If any signal is present and the user is starting non-trivial work, proceed.
-
-3. **Ask if uncertain** — if neither of the above, do not assume. Ask the user, surfacing relevant context:
-   - Is this a multi-step feature or a quick fix?
-   - Does the task have an issue tracker ID (suggesting tracked, non-trivial work)?
-   - Is the repo branch-heavy (many open branches visible in `git branch -r`)?
-
-   Frame the question helpfully: "This looks like [quick fix / tracked feature]. Would you like a worktree for isolation, or work directly on this branch?"
-
-   If the user declines, stop — do not proceed with this skill.
+This skill runs only when the user explicitly asked for a worktree or invoked it by name. If it was
+loaded without such a request, ask once: "Do you want a worktree for this, or should I work on the
+current branch?" If the user declines, stop. Do not proceed with this skill.
 
 ### Step 1 — Gather Task Details
 
@@ -66,7 +65,9 @@ Present the plan and wait for user approval before continuing.
 
 ### Step 3 — Create the Worktree
 
-**Check that the main branch is current before branching.** Run:
+**Check that the base branch is current before branching.** The base is the branch the project says
+new work starts from (a project rule or companion skill names it; when none does, it is the default
+branch). Run:
 
 ```bash
 git fetch --quiet
@@ -75,20 +76,24 @@ behind=$(git rev-list --count HEAD..@{u} 2>/dev/null)
 
 - If `behind` is `0` (or the command errors because there is no upstream), proceed.
 - If `behind` is non-zero, **stop and ask the user:**
-  > "Your main branch is `$behind` commit(s) behind its remote. Pull in the upstream
-  > changes before creating the worktree? (Recommended — skipping may cause unnecessary
-  > merge conflicts.)"
-  - If yes: run `git pull` and verify it succeeds before continuing.
+  > "Your base branch is `$behind` commit(s) behind its remote. Fast-forward it before creating
+  > the worktree? (Recommended — skipping may cause unnecessary merge conflicts.)"
+  - If yes: run `git pull --ff-only` and verify it succeeds before continuing. If it refuses, the
+    branches have diverged: stop and report instead of forcing it.
   - If no: proceed, but note in the Step 6 report that the worktree was created from a
     stale base.
 
-Use worktrunk to create and switch to a new worktree:
+Use worktrunk to create and switch to a new worktree. Add `--base <branch>` when the project's base
+is not the default branch (and for stacked work, see below):
 
 ```bash
 wt switch --create <branch-name> --yes
 ```
 
-**Branch naming:** Follow the project's branch naming conventions. If a project-specific configuration skill provides a convention, use it. Otherwise, derive a reasonable branch name from the task (e.g., `feature/add-user-auth`, `fix/login-timeout`).
+**Branch naming:** Follow the project's branch naming conventions. If a project-specific configuration
+skill or rule provides a convention, use it. Otherwise look at how the repo already names branches
+(`git branch -r --sort=-committerdate | head`) and match that. Only if there is no pattern, derive a
+name from the task (for example `feature/add-user-auth`, `fix/login-timeout`).
 
 Verify that any post-create hooks ran successfully. If any fail, stop and report before continuing.
 
@@ -117,11 +122,11 @@ Write a `WORKTREE_CONTEXT.md` file in the new worktree root. This file is the pr
 ```
 
 **After writing the file, check whether it will be auto-loaded.** Start with
-`auto_load=true` as the default. Then look for a line containing `@@WORKTREE_CONTEXT.md` in
-either `CLAUDE.md` or `CLAUDE.local.md` in the worktree root:
+`auto_load=true` as the default. Then look for an include of the file (`@WORKTREE_CONTEXT.md`, which
+also matches a doubled `@@` variant) in either `CLAUDE.md` or `CLAUDE.local.md` in the worktree root:
 
 ```bash
-grep -l "@@WORKTREE_CONTEXT.md" CLAUDE.md CLAUDE.local.md 2>/dev/null
+grep -lF "@WORKTREE_CONTEXT.md" CLAUDE.md CLAUDE.local.md 2>/dev/null
 ```
 
 - **If a match is found:** the file will be auto-loaded. Leave `auto_load=true`; no further
@@ -237,7 +242,8 @@ you lose isolation and git operations (diff, status, review) become confusing.
 
 - **Merge or PR management** — open a PR for the owner to merge (via your project's PR skill or `gh pr create`); never run `wt merge`
 - **Project-specific pre-flight** (Docker, services, auth) — handled by project-specific companion skills
-- **Worktree cleanup** — use worktrunk directly (`wt remove`) or a finishing skill
+- **Worktree cleanup** — follow the user's removal rules or the project's cleanup skill; the defaults
+  above apply otherwise (`wt remove`, asking about an unmerged branch first)
 
 ## Extensibility
 

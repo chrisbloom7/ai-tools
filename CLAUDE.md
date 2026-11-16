@@ -23,8 +23,12 @@ jq empty <file.json>          # quick JSON syntax check
 - A new skill goes in `plugin.json`'s `skills` list and in the README skills table.
 - No `version` field in the manifests, on purpose (commit c40e1c6). `claude plugin validate` warns
   about it; ignore the warning.
-- Skills assume the Worktrunk `wt` CLI and git. `worktree-start` and `parallel-workstreams` share a
-  "stale main, ask before pull" check, so keep the two copies in step.
+- Skills assume the Worktrunk `wt` CLI and git. The worktree skills carry short inline defaults and
+  defer to the user's own worktree rules when those are loaded; rules cannot ship in a plugin, so keep
+  the defaults in `worktree-start` self-contained. The stale-base check lives only in `worktree-start`
+  (Step 3); `parallel-workstreams` refers to it.
+- `worktree-start` and `parallel-workstreams` trigger only on an explicit request. Keep their
+  descriptions narrow.
 - `docs/superpowers/` and `.claude/settings.local.json` are gitignored.
 
 ## Claude Code setup
